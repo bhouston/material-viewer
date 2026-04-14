@@ -11,6 +11,7 @@ import {
   SphereGeometry,
   WebGLRenderer,
 } from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
 import type { MeshPhysicalNodeMaterial } from 'three/webgpu';
 import type { MaterialXBackgroundPack } from '../lib/backgrounds';
@@ -26,6 +27,7 @@ interface MaterialViewportProps {
 
 const ENV_MAP_URL =
   'https://api.landofassets.com/media/BenHouston3D/Samples/PaulLobeHaus/image/hdr';
+const DEFAULT_CAMERA_POSITION = { x: 0, y: 0, z: 3.2 };
 
 export default function MaterialViewport({
   nodeMaterial,
@@ -41,6 +43,8 @@ export default function MaterialViewport({
   const backgroundSphereRef = useRef<Mesh | null>(null);
   const defaultMaterialRef = useRef<MeshStandardMaterial | null>(null);
   const defaultBackgroundMaterialRef = useRef<MeshStandardMaterial | null>(null);
+  const cameraRef = useRef<PerspectiveCamera | null>(null);
+  const controlsRef = useRef<OrbitControls | null>(null);
   const [rendererLabel, setRendererLabel] = useState('WebGL fallback');
 
   useEffect(() => {
@@ -55,8 +59,9 @@ export default function MaterialViewport({
     const start = async () => {
       const scene = new Scene();
       const camera = new PerspectiveCamera(40, 1, 0.1, 100);
-      camera.position.set(0, 0, 3.2);
+      camera.position.set(DEFAULT_CAMERA_POSITION.x, DEFAULT_CAMERA_POSITION.y, DEFAULT_CAMERA_POSITION.z);
       camera.lookAt(0, 0, 0);
+      cameraRef.current = camera;
 
       const defaultMaterial = new MeshStandardMaterial({ color: 0xc5d4db, metalness: 0, roughness: 0.5 });
       const sphere = new Mesh(
@@ -117,21 +122,25 @@ export default function MaterialViewport({
 
       const resize = () => {
         const viewport = viewportRef.current;
-        const width = Math.max(1, Math.floor(viewport?.clientWidth ?? canvas.clientWidth ?? 640));
-        const height = Math.max(1, Math.floor(viewport?.clientHeight ?? canvas.clientHeight ?? 360));
+        const width = Math.max(1, Math.floor(viewport?.clientWidth ?? 640));
+        const height = Math.max(1, Math.floor(viewport?.clientHeight ?? 360));
         camera.aspect = width / height;
         camera.updateProjectionMatrix();
         renderer.setSize(width, height, false);
       };
 
       resize();
+      const controls = new OrbitControls(camera, canvas);
+      controls.enablePan = false;
+      controls.enableDamping = true;
+      controlsRef.current = controls;
       let resizeFrame = 0;
       let frameId = 0;
       const tick = () => {
         if (disposed) {
           return;
         }
-        sphere.rotation.y += 0.005;
+        controls.update();
         renderer.render(scene, camera);
         frameId = window.requestAnimationFrame(tick);
       };
@@ -155,6 +164,7 @@ export default function MaterialViewport({
           window.cancelAnimationFrame(resizeFrame);
         }
         window.cancelAnimationFrame(frameId);
+        controls.dispose();
         renderer.dispose();
         environmentTexture?.dispose();
         sphere.geometry.dispose();
@@ -165,6 +175,8 @@ export default function MaterialViewport({
         backgroundSphereRef.current = null;
         defaultMaterialRef.current = null;
         defaultBackgroundMaterialRef.current = null;
+        cameraRef.current = null;
+        controlsRef.current = null;
       };
     };
 
@@ -198,6 +210,17 @@ export default function MaterialViewport({
       backgroundMaterial ?? defaultBackgroundMaterial ?? backgroundSphere.material;
   }, [backgroundMaterial]);
 
+  const handleResetView = () => {
+    const camera = cameraRef.current;
+    const controls = controlsRef.current;
+    if (!camera || !controls) {
+      return;
+    }
+    camera.position.set(DEFAULT_CAMERA_POSITION.x, DEFAULT_CAMERA_POSITION.y, DEFAULT_CAMERA_POSITION.z);
+    controls.target.set(0, 0, 0);
+    controls.update();
+  };
+
   return (
     <section className="rounded-lg border border-border bg-card p-4">
       <div className="mb-2 flex items-center justify-between text-sm">
@@ -218,6 +241,13 @@ export default function MaterialViewport({
               </option>
             ))}
           </select>
+          <button
+            className="rounded-md border border-input bg-background px-2 py-1 text-xs hover:bg-muted"
+            onClick={handleResetView}
+            type="button"
+          >
+            Reset view
+          </button>
           <span className="text-muted-foreground">{rendererLabel}</span>
         </div>
       </div>

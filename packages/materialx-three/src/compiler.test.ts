@@ -93,6 +93,76 @@ describe('materialx-three compiler', () => {
     expect(compiled.material.iridescenceThicknessNode).toBeDefined();
   });
 
+  it('maps low-hanging standard_surface physical controls to material slots', () => {
+    const xml = `<?xml version="1.0"?>
+<materialx version="1.39" colorspace="lin_rec709">
+  <standard_surface name="SR_PhysicalControls" type="surfaceshader">
+    <input name="specular" type="float" value="0.85" />
+    <input name="specular_color" type="color3" value="1.0, 0.85, 0.75" />
+    <input name="specular_anisotropy" type="float" value="0.4" />
+    <input name="specular_rotation" type="float" value="0.2" />
+    <input name="coat" type="float" value="0.6" />
+    <input name="coat_roughness" type="float" value="0.2" />
+    <input name="coat_normal" type="vector3" value="0.0, 0.0, 1.0" />
+    <input name="sheen" type="float" value="0.5" />
+    <input name="sheen_color" type="color3" value="0.9, 0.2, 0.2" />
+    <input name="sheen_roughness" type="float" value="0.45" />
+    <input name="opacity" type="color3" value="0.5, 0.5, 0.5" />
+    <input name="transmission" type="float" value="0.7" />
+    <input name="transmission_color" type="color3" value="0.8, 0.9, 1.0" />
+    <input name="transmission_depth" type="float" value="0.35" />
+  </standard_surface>
+  <surfacematerial name="M_PhysicalControls" type="material">
+    <input name="surfaceshader" type="surfaceshader" nodename="SR_PhysicalControls" />
+  </surfacematerial>
+</materialx>`;
+
+    const document = parseMaterialX(xml);
+    const result = compileMaterialXToTSL(document);
+
+    expect(result.assignments.specularIntensityNode).toBeDefined();
+    expect(result.assignments.specularColorNode).toBeDefined();
+    expect(result.assignments.anisotropyNode).toBeDefined();
+    expect(result.assignments.anisotropyRotation).toBeDefined();
+    expect(result.assignments.clearcoatNormalNode).toBeDefined();
+    expect(result.assignments.sheenNode).toBeDefined();
+    expect(result.assignments.sheenRoughnessNode).toBeDefined();
+    expect(result.assignments.opacityNode).toBeDefined();
+    expect(result.assignments.attenuationColorNode).toBeDefined();
+    expect(result.assignments.attenuationDistanceNode).toBeDefined();
+
+    const compiled = createThreeMaterialFromDocument(document);
+    expect(compiled.material.specularIntensityNode).toBeDefined();
+    expect(compiled.material.specularColorNode).toBeDefined();
+    expect(compiled.material.anisotropyNode).toBeDefined();
+    expect(compiled.material.anisotropyRotation).toBe(0.2);
+    expect(compiled.material.clearcoatNormalNode).toBeDefined();
+    expect(compiled.material.sheenNode).toBeDefined();
+    expect(compiled.material.sheenRoughnessNode).toBeDefined();
+    expect(compiled.material.opacityNode).toBeDefined();
+    expect(compiled.material.transparent).toBe(false);
+    expect(compiled.material.attenuationColorNode).toBeDefined();
+    expect(compiled.material.attenuationDistanceNode).toBeDefined();
+  });
+
+  it('enables transparent blending for opacity-only materials', () => {
+    const xml = `<?xml version="1.0"?>
+<materialx version="1.39" colorspace="lin_rec709">
+  <standard_surface name="SR_OpacityOnly" type="surfaceshader">
+    <input name="base_color" type="color3" value="0.8, 0.2, 0.2" />
+    <input name="opacity" type="color3" value="0.35, 0.35, 0.35" />
+  </standard_surface>
+  <surfacematerial name="M_OpacityOnly" type="material">
+    <input name="surfaceshader" type="surfaceshader" nodename="SR_OpacityOnly" />
+  </surfacematerial>
+</materialx>`;
+
+    const compiled = createThreeMaterialFromDocument(parseMaterialX(xml));
+    expect(compiled.material.opacityNode).toBeDefined();
+    expect(compiled.material.transmissionNode).toBeUndefined();
+    expect(compiled.material.transparent).toBe(true);
+  });
+
   it('reports unsupported surface shader graphs', () => {
     const result = compileFixture(openPbrFixture);
     expect(result.warnings.some((entry) => entry.code === 'unsupported-node')).toBe(true);

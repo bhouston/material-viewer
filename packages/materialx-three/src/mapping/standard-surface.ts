@@ -1,25 +1,66 @@
 import type { MaterialXNode } from '@materialx-js/materialx';
-import { mix, mul, step, vec3 } from 'three/tsl';
+import { dot, mix, mul, step, vec3 } from 'three/tsl';
 import type { MaterialSlotAssignments } from '../types.js';
 
 export interface StandardSurfaceInputs {
   getInputNode(node: MaterialXNode, name: string, fallback: unknown): unknown;
 }
 
+const multiplyNodeValues = (left: unknown, right: unknown): unknown =>
+  (left as { mul?: (other: unknown) => unknown }).mul?.(right) ?? mul(left as never, right as never);
+
+const toOpacityScalar = (opacity: unknown): unknown => {
+  if (typeof opacity === 'number') {
+    return opacity;
+  }
+  if (Array.isArray(opacity) && opacity.length >= 3) {
+    const [r, g, b] = opacity;
+    if (typeof r === 'number' && typeof g === 'number' && typeof b === 'number') {
+      return r * 0.2126 + g * 0.7152 + b * 0.0722;
+    }
+  }
+  return dot(opacity as never, vec3(0.2126, 0.7152, 0.0722));
+};
+
+const toAttenuationDistance = (depth: unknown): unknown => {
+  if (depth === undefined) {
+    return undefined;
+  }
+  if (typeof depth === 'number') {
+    return depth > 0 ? depth : undefined;
+  }
+  return depth;
+};
+
 export const buildStandardSurfaceAssignments = (
   surfaceNode: MaterialXNode,
   helpers: StandardSurfaceInputs
 ): MaterialSlotAssignments => {
+  const hasInput = (name: string) => surfaceNode.inputs.some((input) => input.name === name);
   const base = helpers.getInputNode(surfaceNode, 'base', 1);
   const baseColor = helpers.getInputNode(surfaceNode, 'base_color', [0.8, 0.8, 0.8]);
   const roughness = helpers.getInputNode(surfaceNode, 'specular_roughness', 0.2);
   const metalness = helpers.getInputNode(surfaceNode, 'metalness', 0);
+  const specular = helpers.getInputNode(surfaceNode, 'specular', 1);
+  const specularColor = helpers.getInputNode(surfaceNode, 'specular_color', [1, 1, 1]);
+  const anisotropy = helpers.getInputNode(surfaceNode, 'specular_anisotropy', 0);
+  const anisotropyRotation = helpers.getInputNode(surfaceNode, 'specular_rotation', 0);
   const coat = helpers.getInputNode(surfaceNode, 'coat', 0);
   const coatColor = helpers.getInputNode(surfaceNode, 'coat_color', [1, 1, 1]);
   const coatRoughness = helpers.getInputNode(surfaceNode, 'coat_roughness', 0.1);
+  const coatNormal = helpers.getInputNode(surfaceNode, 'coat_normal', undefined);
+  const sheen = helpers.getInputNode(surfaceNode, 'sheen', 0);
+  const sheenColor = helpers.getInputNode(surfaceNode, 'sheen_color', [1, 1, 1]);
+  const sheenRoughness = helpers.getInputNode(surfaceNode, 'sheen_roughness', 0.3);
   const emissionColor = helpers.getInputNode(surfaceNode, 'emission_color', [0, 0, 0]);
   const emissionAmount = helpers.getInputNode(surfaceNode, 'emission', 0);
-  const transmission = helpers.getInputNode(surfaceNode, 'transmission', 0);
+  const opacity = helpers.getInputNode(surfaceNode, 'opacity', undefined);
+  const hasTransmission = hasInput('transmission');
+  const transmission = hasTransmission ? helpers.getInputNode(surfaceNode, 'transmission', 0) : undefined;
+  const transmissionColor = hasTransmission ? helpers.getInputNode(surfaceNode, 'transmission_color', [1, 1, 1]) : undefined;
+  const transmissionDepth = hasInput('transmission_depth')
+    ? helpers.getInputNode(surfaceNode, 'transmission_depth', undefined)
+    : undefined;
   const ior = helpers.getInputNode(surfaceNode, 'specular_IOR', 1.5);
   const thinFilmThickness = helpers.getInputNode(surfaceNode, 'thin_film_thickness', 0);
   const thinFilmIOR = helpers.getInputNode(
@@ -33,7 +74,10 @@ export const buildStandardSurfaceAssignments = (
   // StandardSurface copper/brass examples tint via coat_color even when base_color is white.
   const coatTint = mix(vec3(1, 1, 1), coatColor as never, coat as never);
   const colorNode = mul(baseLayerColor as never, coatTint as never);
-  const emissiveNode = (emissionColor as { mul?: (other: unknown) => unknown }).mul?.(emissionAmount) ?? emissionColor;
+  const emissiveNode = multiplyNodeValues(emissionColor, emissionAmount);
+  const sheenNode = multiplyNodeValues(sheenColor, sheen);
+  const opacityNode = opacity === undefined ? undefined : toOpacityScalar(opacity);
+  const attenuationDistanceNode = toAttenuationDistance(transmissionDepth);
   // StandardSurface has no explicit thin-film weight. Derive a 0/1 iridescence
   // enable signal from thickness so this aligns with glTF/Three semantics.
   const thinFilmEnabled = step(0.0001, thinFilmThickness as never);
@@ -42,10 +86,20 @@ export const buildStandardSurfaceAssignments = (
     colorNode,
     roughnessNode: roughness,
     metalnessNode: metalness,
+    specularIntensityNode: specular,
+    specularColorNode: specularColor,
+    anisotropyNode: anisotropy,
+    anisotropyRotation,
     clearcoatNode: coat,
     clearcoatRoughnessNode: coatRoughness,
+    clearcoatNormalNode: coatNormal,
+    sheenNode,
+    sheenRoughnessNode: sheenRoughness,
     emissiveNode,
+    opacityNode,
     transmissionNode: transmission,
+    attenuationColorNode: transmissionColor,
+    attenuationDistanceNode,
     iorNode: ior,
     iridescenceNode: thinFilmEnabled,
     iridescenceIORNode: thinFilmIOR,

@@ -928,22 +928,64 @@ export const compileMaterialXToTSL = (
   };
 };
 
+const readNumberLiteral = (value: unknown): number | undefined => {
+  if (typeof value === 'number') {
+    return value;
+  }
+  if (!value || typeof value !== 'object') {
+    return undefined;
+  }
+  const nodeValue = (value as { value?: unknown }).value;
+  if (typeof nodeValue === 'number') {
+    return nodeValue;
+  }
+  const nestedNodeValue = ((value as { node?: { value?: unknown } }).node?.value);
+  if (typeof nestedNodeValue === 'number') {
+    return nestedNodeValue;
+  }
+  return undefined;
+};
+
 export const createThreeMaterialFromDocument = (
   document: MaterialXDocument,
   options: MaterialXThreeCompileOptions = {}
 ): { material: MeshPhysicalNodeMaterial; result: MaterialXThreeCompileResult } => {
   const result = compileMaterialXToTSL(document, options);
   const material = new MeshPhysicalNodeMaterial();
+  const opacityAssignment = result.assignments.opacityNode;
+  const transmissionAssignment = result.assignments.transmissionNode;
+  const hasTransmission =
+    transmissionAssignment !== undefined &&
+    (typeof transmissionAssignment !== 'number' || transmissionAssignment > 0.0001);
+  const hasFractionalOpacity = typeof opacityAssignment === 'number' ? opacityAssignment < 0.9999 : opacityAssignment !== undefined;
 
   material.color = new Color(1, 1, 1);
   material.colorNode = result.assignments.colorNode as never;
   material.roughnessNode = result.assignments.roughnessNode as never;
   material.metalnessNode = result.assignments.metalnessNode as never;
+  material.specularIntensityNode = result.assignments.specularIntensityNode as never;
+  material.specularColorNode = result.assignments.specularColorNode as never;
+  material.anisotropyNode = result.assignments.anisotropyNode as never;
+  const anisotropyRotation = readNumberLiteral(result.assignments.anisotropyRotation);
+  if (anisotropyRotation !== undefined) {
+    material.anisotropyRotation = anisotropyRotation;
+  }
   material.clearcoatNode = result.assignments.clearcoatNode as never;
   material.clearcoatRoughnessNode = result.assignments.clearcoatRoughnessNode as never;
+  material.clearcoatNormalNode = result.assignments.clearcoatNormalNode as never;
+  material.sheenNode = result.assignments.sheenNode as never;
+  material.sheenRoughnessNode = result.assignments.sheenRoughnessNode as never;
   material.normalNode = result.assignments.normalNode as never;
   material.emissiveNode = result.assignments.emissiveNode as never;
-  material.transmissionNode = result.assignments.transmissionNode as never;
+  material.opacityNode = opacityAssignment as never;
+  // Three.js transmission path expects opaque blending by default.
+  material.transparent = hasTransmission ? false : hasFractionalOpacity;
+  material.transmissionNode = transmissionAssignment as never;
+  if (hasTransmission) {
+    material.opacity = 1;
+  }
+  material.attenuationColorNode = result.assignments.attenuationColorNode as never;
+  material.attenuationDistanceNode = result.assignments.attenuationDistanceNode as never;
   material.iorNode = result.assignments.iorNode as never;
   material.iridescenceNode = result.assignments.iridescenceNode as never;
   material.iridescenceIORNode = result.assignments.iridescenceIORNode as never;

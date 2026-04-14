@@ -14,6 +14,31 @@ This package is designed to sit on top of `@materialx-js/materialx` and produce 
 
 This is still an evolving implementation, not full MaterialX parity.
 
+## Standard Surface Mapping
+
+Currently mapped `standard_surface` inputs:
+
+- `base`, `base_color`
+- `specular_roughness`, `metalness`
+- `specular`, `specular_color`
+- `specular_anisotropy`, `specular_rotation` (rotation is applied when a literal value can be resolved)
+- `coat`, `coat_color`, `coat_roughness`, `coat_normal`
+- `sheen`, `sheen_color`, `sheen_roughness`
+- `emission`, `emission_color`
+- `opacity` (converted from `color3` to scalar luminance for `opacityNode`)
+- `transmission`, `transmission_color`, `transmission_depth`
+- `specular_IOR`
+- `thin_film_thickness`, `thin_film_IOR` / `thin_film_ior`
+- `normal`
+
+Not yet mapped in this package:
+
+- Diffuse and advanced specular controls such as `diffuse_roughness`
+- Subsurface controls (`subsurface*`)
+- Coat advanced controls (`coat_anisotropy`, `coat_IOR`, `coat_affect_*`)
+- Thin-walled/tangent controls (`thin_walled`, `tangent`)
+- Advanced transmission controls (`transmission_scatter*`, `transmission_dispersion`, `transmission_extra_roughness`)
+
 ## Installation
 
 In this monorepo:
