@@ -2,25 +2,55 @@ import type { MaterialXDocument, MaterialXInput, MaterialXNode, MaterialXNodeGra
 import { Color } from 'three';
 import { MeshPhysicalNodeMaterial } from 'three/webgpu';
 import {
+  abs,
   add,
+  acos,
+  asin,
+  ceil,
   clamp,
+  cos,
+  cross,
+  distance,
   div,
   dot,
+  exp,
+  floor,
   float,
+  log,
   luminance,
   max,
   min,
+  mod,
+  mx_cell_noise_float,
   mix,
   mx_contrast,
+  mx_fractal_noise_float,
   mx_heighttonormal,
   mx_hsvtorgb,
+  mx_ifequal,
+  mx_ifgreater,
+  mx_ifgreatereq,
+  mx_noise_float,
+  mx_place2d,
   mx_rgbtohsv,
+  mx_unifiednoise2d,
+  mx_unifiednoise3d,
+  mx_worley_noise_float,
   mul,
   normalMap,
   normalWorld,
   normalize,
+  pow,
   positionWorld,
+  reflect,
+  refract,
+  round,
+  sign,
+  sin,
+  smoothstep,
+  sqrt,
   sub,
+  tan,
   texture,
   uv,
   vec2,
@@ -93,8 +123,28 @@ const warn = (context: CompileContext, warning: MaterialXThreeWarning): void => 
   context.warnings.push(warning);
 };
 
-const cacheKey = (node: MaterialXNode, scopeGraph?: MaterialXNodeGraph): string =>
-  `${scopeGraph?.name ?? 'document'}:${node.name ?? node.category}`;
+const cacheKey = (node: MaterialXNode, scopeGraph?: MaterialXNodeGraph, outputName?: string): string =>
+  `${scopeGraph?.name ?? 'document'}:${node.name ?? node.category}:${outputName ?? 'out'}`;
+
+const outputNameToChannelIndex = (outputName?: string): number => {
+  if (!outputName) {
+    return 0;
+  }
+  const normalized = outputName.toLowerCase();
+  if (normalized.endsWith('x') || normalized.endsWith('r')) {
+    return 0;
+  }
+  if (normalized.endsWith('y') || normalized.endsWith('g')) {
+    return 1;
+  }
+  if (normalized.endsWith('z') || normalized.endsWith('b')) {
+    return 2;
+  }
+  if (normalized.endsWith('w') || normalized.endsWith('a')) {
+    return 3;
+  }
+  return 0;
+};
 
 const getNodeChannel = (node: unknown, index: number): unknown => {
   const channels = ['x', 'y', 'z', 'w'];
@@ -132,7 +182,7 @@ const resolveInputNode = (
 
   const reference = resolveInputReference(input, scopeGraph, context.index);
   if (reference?.fromNode) {
-    return compileNode(reference.fromNode, context, reference.fromGraph ?? scopeGraph);
+    return compileNode(reference.fromNode, context, reference.fromGraph ?? scopeGraph, reference.fromOutput?.name);
   }
 
   if (input.attributes.value !== undefined) {
@@ -193,6 +243,30 @@ const compileTextureNode = (node: MaterialXNode, context: CompileContext, scopeG
   return selectTextureSample(colorCorrected, node.type);
 };
 
+const compileHexTiledTextureNode = (node: MaterialXNode, context: CompileContext, scopeGraph?: MaterialXNodeGraph): unknown => {
+  const fileInput = readInput(node, 'file');
+  const uri = fileInput?.value ?? fileInput?.attributes.value;
+  if (!uri) {
+    warn(context, {
+      code: 'invalid-value',
+      message: `Texture node "${node.name ?? node.category}" is missing a file input`,
+      category: node.category,
+      nodeName: node.name,
+    });
+    return vec4(0, 0, 0, 1);
+  }
+
+  const uvNode = resolveInputNode(node, 'texcoord', uv(0), context, scopeGraph);
+  const tiling = resolveInputNode(node, 'tiling', vec2(1, 1), context, scopeGraph);
+  const transformedUv = mul(uvNode as never, tiling as never);
+
+  const textureResolver = context.options.textureResolver ?? createTextureResolver({ basePath: context.options.basePath });
+  const tex = textureResolver.resolve(uri, { document: context.document, node });
+  const sampled = texture(tex, transformedUv as never);
+  const colorCorrected = applyTextureColorSpace(context.document.attributes.colorspace, sampled);
+  return selectTextureSample(colorCorrected, node.type);
+};
+
 const compileBinaryMath = (
   node: MaterialXNode,
   leftName: string,
@@ -206,8 +280,13 @@ const compileBinaryMath = (
   return operator(left, right);
 };
 
-const compileNode = (node: MaterialXNode, context: CompileContext, scopeGraph?: MaterialXNodeGraph): unknown => {
-  const key = cacheKey(node, scopeGraph);
+const compileNode = (
+  node: MaterialXNode,
+  context: CompileContext,
+  scopeGraph?: MaterialXNodeGraph,
+  outputName?: string
+): unknown => {
+  const key = cacheKey(node, scopeGraph, outputName);
   const cached = context.cache.get(key);
   if (cached !== undefined) {
     return cached;
@@ -302,6 +381,113 @@ const compileNode = (node: MaterialXNode, context: CompileContext, scopeGraph?: 
       compiled = normalize(inNode as never);
       break;
     }
+    case 'modulo':
+      compiled = compileBinaryMath(node, 'in1', 'in2', context, scopeGraph, (left, right) => mod(left as never, right as never));
+      break;
+    case 'absval': {
+      const inNode = resolveInputNode(node, 'in', 0, context, scopeGraph);
+      compiled = abs(inNode as never);
+      break;
+    }
+    case 'sign': {
+      const inNode = resolveInputNode(node, 'in', 0, context, scopeGraph);
+      compiled = sign(inNode as never);
+      break;
+    }
+    case 'floor': {
+      const inNode = resolveInputNode(node, 'in', 0, context, scopeGraph);
+      compiled = floor(inNode as never);
+      break;
+    }
+    case 'ceil': {
+      const inNode = resolveInputNode(node, 'in', 0, context, scopeGraph);
+      compiled = ceil(inNode as never);
+      break;
+    }
+    case 'round': {
+      const inNode = resolveInputNode(node, 'in', 0, context, scopeGraph);
+      compiled = round(inNode as never);
+      break;
+    }
+    case 'sin': {
+      const inNode = resolveInputNode(node, 'in', 0, context, scopeGraph);
+      compiled = sin(inNode as never);
+      break;
+    }
+    case 'cos': {
+      const inNode = resolveInputNode(node, 'in', 0, context, scopeGraph);
+      compiled = cos(inNode as never);
+      break;
+    }
+    case 'tan': {
+      const inNode = resolveInputNode(node, 'in', 0, context, scopeGraph);
+      compiled = tan(inNode as never);
+      break;
+    }
+    case 'asin': {
+      const inNode = resolveInputNode(node, 'in', 0, context, scopeGraph);
+      compiled = asin(inNode as never);
+      break;
+    }
+    case 'acos': {
+      const inNode = resolveInputNode(node, 'in', 0, context, scopeGraph);
+      compiled = acos(inNode as never);
+      break;
+    }
+    case 'sqrt': {
+      const inNode = resolveInputNode(node, 'in', 0, context, scopeGraph);
+      compiled = sqrt(inNode as never);
+      break;
+    }
+    case 'exp': {
+      const inNode = resolveInputNode(node, 'in', 0, context, scopeGraph);
+      compiled = exp(inNode as never);
+      break;
+    }
+    case 'ln': {
+      const inNode = resolveInputNode(node, 'in', 1, context, scopeGraph);
+      compiled = log(inNode as never);
+      break;
+    }
+    case 'power':
+      compiled = compileBinaryMath(node, 'in1', 'in2', context, scopeGraph, (left, right) => pow(left as never, right as never));
+      break;
+    case 'distance':
+      compiled = compileBinaryMath(node, 'in1', 'in2', context, scopeGraph, (left, right) => distance(left as never, right as never));
+      break;
+    case 'crossproduct':
+      compiled = compileBinaryMath(node, 'in1', 'in2', context, scopeGraph, (left, right) => cross(left as never, right as never));
+      break;
+    case 'invert': {
+      const inNode = resolveInputNode(node, 'in', 0, context, scopeGraph);
+      const amount = resolveInputNode(node, 'amount', 1, context, scopeGraph);
+      compiled = sub(amount as never, inNode as never);
+      break;
+    }
+    case 'smoothstep': {
+      const inNode = resolveInputNode(node, 'in', 0, context, scopeGraph);
+      const low = resolveInputNode(node, 'low', 0, context, scopeGraph);
+      const high = resolveInputNode(node, 'high', 1, context, scopeGraph);
+      compiled = smoothstep(low as never, high as never, inNode as never);
+      break;
+    }
+    case 'saturate': {
+      const inNode = resolveInputNode(node, 'in', 0, context, scopeGraph);
+      compiled = clamp(inNode as never, float(0), float(1));
+      break;
+    }
+    case 'remap': {
+      const inNode = resolveInputNode(node, 'in', 0, context, scopeGraph);
+      const inLow = resolveInputNode(node, 'inlow', 0, context, scopeGraph);
+      const inHigh = resolveInputNode(node, 'inhigh', 1, context, scopeGraph);
+      const outLow = resolveInputNode(node, 'outlow', 0, context, scopeGraph);
+      const outHigh = resolveInputNode(node, 'outhigh', 1, context, scopeGraph);
+      const rangeIn = sub(inHigh as never, inLow as never);
+      const rangeOut = sub(outHigh as never, outLow as never);
+      const normalized = div(sub(inNode as never, inLow as never), rangeIn as never);
+      compiled = add(outLow as never, mul(normalized as never, rangeOut as never));
+      break;
+    }
     case 'combine2': {
       const x = resolveInputNode(node, 'in1', 0, context, scopeGraph);
       const y = resolveInputNode(node, 'in2', 0, context, scopeGraph);
@@ -329,6 +515,165 @@ const compileNode = (node: MaterialXNode, context: CompileContext, scopeGraph?: 
       const indexInput = readInput(node, 'index');
       const channelIndex = Math.max(0, Math.floor(parseFloatValue(indexInput?.value ?? indexInput?.attributes.value, 0)));
       compiled = getNodeChannel(inNode, channelIndex);
+      break;
+    }
+    case 'separate2':
+    case 'separate3':
+    case 'separate4': {
+      const inNode = resolveInputNode(node, 'in', vec4(0, 0, 0, 1), context, scopeGraph);
+      const channelIndex = outputNameToChannelIndex(outputName);
+      compiled = getNodeChannel(inNode, channelIndex);
+      break;
+    }
+    case 'place2d': {
+      const texcoord = resolveInputNode(node, 'texcoord', uv(0), context, scopeGraph);
+      const pivot = resolveInputNode(node, 'pivot', vec2(0.5, 0.5), context, scopeGraph);
+      const scaleNode = resolveInputNode(node, 'scale', vec2(1, 1), context, scopeGraph);
+      const rotate = resolveInputNode(node, 'rotate', 0, context, scopeGraph);
+      const offset = resolveInputNode(node, 'offset', vec2(0, 0), context, scopeGraph);
+      compiled = mx_place2d(
+        texcoord as never,
+        pivot as never,
+        scaleNode as never,
+        rotate as never,
+        offset as never
+      );
+      break;
+    }
+    case 'ifgreater': {
+      const value1 = resolveInputNode(node, 'value1', 0, context, scopeGraph);
+      const value2 = resolveInputNode(node, 'value2', 0, context, scopeGraph);
+      const in1 = resolveInputNode(node, 'in1', 1, context, scopeGraph);
+      const in2 = resolveInputNode(node, 'in2', 0, context, scopeGraph);
+      compiled = mx_ifgreater(value1 as never, value2 as never, in1 as never, in2 as never);
+      break;
+    }
+    case 'ifgreatereq': {
+      const value1 = resolveInputNode(node, 'value1', 0, context, scopeGraph);
+      const value2 = resolveInputNode(node, 'value2', 0, context, scopeGraph);
+      const in1 = resolveInputNode(node, 'in1', 1, context, scopeGraph);
+      const in2 = resolveInputNode(node, 'in2', 0, context, scopeGraph);
+      compiled = mx_ifgreatereq(value1 as never, value2 as never, in1 as never, in2 as never);
+      break;
+    }
+    case 'ifequal': {
+      const value1 = resolveInputNode(node, 'value1', 0, context, scopeGraph);
+      const value2 = resolveInputNode(node, 'value2', 0, context, scopeGraph);
+      const in1 = resolveInputNode(node, 'in1', 1, context, scopeGraph);
+      const in2 = resolveInputNode(node, 'in2', 0, context, scopeGraph);
+      compiled = mx_ifequal(value1 as never, value2 as never, in1 as never, in2 as never);
+      break;
+    }
+    case 'reflect': {
+      const inNode = resolveInputNode(node, 'in', vec3(0, 0, 0), context, scopeGraph);
+      const normal = resolveInputNode(node, 'normal', vec3(0, 0, 1), context, scopeGraph);
+      compiled = reflect(inNode as never, normal as never);
+      break;
+    }
+    case 'refract': {
+      const inNode = resolveInputNode(node, 'in', vec3(0, 0, 0), context, scopeGraph);
+      const normal = resolveInputNode(node, 'normal', vec3(0, 0, 1), context, scopeGraph);
+      const ior = resolveInputNode(node, 'ior', 1.5, context, scopeGraph);
+      compiled = refract(inNode as never, normal as never, ior as never);
+      break;
+    }
+    case 'noise2d':
+    case 'noise3d': {
+      const texcoord = resolveInputNode(node, 'texcoord', vec2(0, 0), context, scopeGraph);
+      const amplitude = resolveInputNode(node, 'amplitude', 1, context, scopeGraph);
+      const pivot = resolveInputNode(node, 'pivot', 0, context, scopeGraph);
+      compiled = mx_noise_float(texcoord as never, amplitude as never, pivot as never);
+      break;
+    }
+    case 'fractal3d': {
+      const position = resolveInputNode(node, 'position', vec3(0, 0, 0), context, scopeGraph);
+      const octaves = resolveInputNode(node, 'octaves', 3, context, scopeGraph);
+      const lacunarity = resolveInputNode(node, 'lacunarity', 2, context, scopeGraph);
+      const diminish = resolveInputNode(node, 'diminish', 0.5, context, scopeGraph);
+      const amplitude = resolveInputNode(node, 'amplitude', 1, context, scopeGraph);
+      compiled = mx_fractal_noise_float(
+        position as never,
+        octaves as never,
+        lacunarity as never,
+        diminish as never,
+        amplitude as never
+      );
+      break;
+    }
+    case 'cellnoise2d':
+    case 'cellnoise3d': {
+      const texcoord = resolveInputNode(node, 'texcoord', vec2(0, 0), context, scopeGraph);
+      compiled = mx_cell_noise_float(texcoord as never);
+      break;
+    }
+    case 'worleynoise2d':
+    case 'worleynoise3d': {
+      const texcoord = resolveInputNode(node, 'texcoord', vec2(0, 0), context, scopeGraph);
+      const jitter = resolveInputNode(node, 'jitter', 1, context, scopeGraph);
+      compiled = mx_worley_noise_float(texcoord as never, jitter as never);
+      break;
+    }
+    case 'unifiednoise2d': {
+      const type = resolveInputNode(node, 'type', 0, context, scopeGraph);
+      const texcoord = resolveInputNode(node, 'texcoord', vec2(0, 0), context, scopeGraph);
+      const freq = resolveInputNode(node, 'freq', vec2(1, 1), context, scopeGraph);
+      const offset = resolveInputNode(node, 'offset', vec2(0, 0), context, scopeGraph);
+      const jitter = resolveInputNode(node, 'jitter', 1, context, scopeGraph);
+      const outMin = resolveInputNode(node, 'outmin', 0, context, scopeGraph);
+      const outMax = resolveInputNode(node, 'outmax', 1, context, scopeGraph);
+      const clampOutput = resolveInputNode(node, 'clampoutput', 0, context, scopeGraph);
+      const octaves = resolveInputNode(node, 'octaves', 3, context, scopeGraph);
+      const lacunarity = resolveInputNode(node, 'lacunarity', 2, context, scopeGraph);
+      const diminish = resolveInputNode(node, 'diminish', 0.5, context, scopeGraph);
+      compiled = mx_unifiednoise2d(
+        type as never,
+        texcoord as never,
+        freq as never,
+        offset as never,
+        jitter as never,
+        outMin as never,
+        outMax as never,
+        clampOutput as never,
+        octaves as never,
+        lacunarity as never,
+        diminish as never
+      );
+      break;
+    }
+    case 'unifiednoise3d': {
+      const type = resolveInputNode(node, 'type', 0, context, scopeGraph);
+      const texcoord = resolveInputNode(node, 'texcoord', vec3(0, 0, 0), context, scopeGraph);
+      const freq = resolveInputNode(node, 'freq', vec3(1, 1, 1), context, scopeGraph);
+      const offset = resolveInputNode(node, 'offset', vec3(0, 0, 0), context, scopeGraph);
+      const jitter = resolveInputNode(node, 'jitter', 1, context, scopeGraph);
+      const outMin = resolveInputNode(node, 'outmin', 0, context, scopeGraph);
+      const outMax = resolveInputNode(node, 'outmax', 1, context, scopeGraph);
+      const clampOutput = resolveInputNode(node, 'clampoutput', 0, context, scopeGraph);
+      const octaves = resolveInputNode(node, 'octaves', 3, context, scopeGraph);
+      const lacunarity = resolveInputNode(node, 'lacunarity', 2, context, scopeGraph);
+      const diminish = resolveInputNode(node, 'diminish', 0.5, context, scopeGraph);
+      compiled = mx_unifiednoise3d(
+        type as never,
+        texcoord as never,
+        freq as never,
+        offset as never,
+        jitter as never,
+        outMin as never,
+        outMax as never,
+        clampOutput as never,
+        octaves as never,
+        lacunarity as never,
+        diminish as never
+      );
+      break;
+    }
+    case 'hextiledimage':
+      compiled = compileHexTiledTextureNode(node, context, scopeGraph);
+      break;
+    case 'hextilednormalmap': {
+      const normalSample = compileHexTiledTextureNode(node, context, scopeGraph);
+      const scaleNode = resolveInputNode(node, 'scale', 1, context, scopeGraph);
+      compiled = normalMap(normalSample as never, scaleNode as never);
       break;
     }
     case 'hsvtorgb': {

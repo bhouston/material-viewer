@@ -5,12 +5,18 @@ Generated from `@materialx-js/materialx` node registry.
 ## Summary
 
 - Total categories in registry: 223
-- Supported categories: 30
-- Unsupported categories: 193
+- Supported categories: 71
+- Unsupported categories: 152
 
 ## Supported
 
+- `absval`
+- `acos`
 - `add`
+- `asin`
+- `ceil`
+- `cellnoise2d`
+- `cellnoise3d`
 - `clamp`
 - `combine2`
 - `combine3`
@@ -18,28 +24,63 @@ Generated from `@materialx-js/materialx` node registry.
 - `constant`
 - `contrast`
 - `convert`
+- `cos`
+- `crossproduct`
+- `distance`
 - `divide`
 - `dot`
 - `dotproduct`
+- `exp`
 - `extract`
+- `floor`
+- `fractal3d`
 - `heighttonormal`
+- `hextiledimage`
+- `hextilednormalmap`
 - `hsvtorgb`
+- `ifequal`
+- `ifgreater`
+- `ifgreatereq`
 - `image`
+- `invert`
+- `ln`
 - `luminance`
 - `max`
 - `min`
 - `mix`
+- `modulo`
 - `multiply`
+- `noise2d`
+- `noise3d`
 - `normal`
 - `normalize`
 - `normalmap`
+- `place2d`
 - `position`
+- `power`
+- `reflect`
+- `refract`
+- `remap`
 - `rgbtohsv`
+- `round`
+- `saturate`
+- `separate2`
+- `separate3`
+- `separate4`
+- `sign`
+- `sin`
+- `smoothstep`
+- `sqrt`
 - `standard_surface`
 - `subtract`
 - `surfacematerial`
+- `tan`
 - `texcoord`
 - `tiledimage`
+- `unifiednoise2d`
+- `unifiednoise3d`
+- `worleynoise2d`
+- `worleynoise3d`
 
 ## Unsupported
 
@@ -61,14 +102,11 @@ Generated from `@materialx-js/materialx` node registry.
 - `UsdTransform2d`
 - `UsdUVTexture`
 - `absorption_vdf`
-- `absval`
 - `acescg_to_lin_rec709`
-- `acos`
 - `adobergb_to_lin_rec709`
 - `and`
 - `anisotropic_vdf`
 - `artistic_ior`
-- `asin`
 - `atan2`
 - `bitangent`
 - `blackbody`
@@ -76,9 +114,6 @@ Generated from `@materialx-js/materialx` node registry.
 - `bump`
 - `burley_diffuse_bsdf`
 - `burn`
-- `ceil`
-- `cellnoise2d`
-- `cellnoise3d`
 - `checkerboard`
 - `chiang_hair_absorption_from_color`
 - `chiang_hair_bsdf`
@@ -88,10 +123,8 @@ Generated from `@materialx-js/materialx` node registry.
 - `colorcorrect`
 - `conductor_bsdf`
 - `conical_edf`
-- `cos`
 - `creatematrix`
 - `crosshatch`
-- `crossproduct`
 - `deon_hair_absorption_from_melanin`
 - `determinant`
 - `dielectric_bsdf`
@@ -100,16 +133,12 @@ Generated from `@materialx-js/materialx` node registry.
 - `disjointover`
 - `disney_principled`
 - `displacement`
-- `distance`
 - `dodge`
-- `exp`
 - `facingratio`
 - `flake2d`
 - `flake3d`
-- `floor`
 - `fract`
 - `fractal2d`
-- `fractal3d`
 - `frame`
 - `g18_rec709_to_lin_rec709`
 - `g22_ap1_to_lin_rec709`
@@ -129,15 +158,9 @@ Generated from `@materialx-js/materialx` node registry.
 - `gooch_shade`
 - `grid`
 - `hexagon`
-- `hextiledimage`
-- `hextilednormalmap`
 - `hsvadjust`
-- `ifequal`
-- `ifgreater`
-- `ifgreatereq`
 - `in`
 - `inside`
-- `invert`
 - `invertmatrix`
 - `latlongimage`
 - `layer`
@@ -145,16 +168,12 @@ Generated from `@materialx-js/materialx` node registry.
 - `lin_adobergb_to_lin_rec709`
 - `lin_displayp3_to_lin_rec709`
 - `line`
-- `ln`
 - `magnitude`
 - `mask`
 - `matte`
 - `measured_edf`
 - `minus`
-- `modulo`
 - `nodegraph`
-- `noise2d`
-- `noise3d`
 - `not`
 - `open_pbr_anisotropy`
 - `open_pbr_surface`
@@ -167,10 +186,8 @@ Generated from `@materialx-js/materialx` node registry.
 - `outside`
 - `over`
 - `overlay`
-- `place2d`
 - `plus`
 - `point_light`
-- `power`
 - `premult`
 - `ramp`
 - `ramp4`
@@ -181,28 +198,16 @@ Generated from `@materialx-js/materialx` node registry.
 - `randomfloat`
 - `range`
 - `rec709_display_to_lin_rec709`
-- `reflect`
-- `refract`
-- `remap`
 - `rotate2d`
 - `rotate3d`
 - `roughness_anisotropy`
 - `roughness_dual`
-- `round`
 - `safepower`
-- `saturate`
 - `screen`
-- `separate2`
-- `separate3`
-- `separate4`
 - `sheen_bsdf`
-- `sign`
-- `sin`
-- `smoothstep`
 - `splitlr`
 - `splittb`
 - `spot_light`
-- `sqrt`
 - `srgb_displayp3_to_lin_rec709`
 - `srgb_texture_to_lin_rec709`
 - `standard_surface_to_UsdPreviewSurface`
@@ -212,7 +217,6 @@ Generated from `@materialx-js/materialx` node registry.
 - `surface`
 - `surface_unlit`
 - `switch`
-- `tan`
 - `tangent`
 - `tiledcircles`
 - `tiledcloverleafs`
@@ -226,14 +230,10 @@ Generated from `@materialx-js/materialx` node registry.
 - `transpose`
 - `trianglewave`
 - `triplanarprojection`
-- `unifiednoise2d`
-- `unifiednoise3d`
 - `uniform_edf`
 - `unpremult`
 - `viewdirection`
 - `volume`
 - `volumematerial`
-- `worleynoise2d`
-- `worleynoise3d`
 - `xor`
 
