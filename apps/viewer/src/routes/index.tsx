@@ -11,7 +11,7 @@ import { Separator } from '../components/ui/separator'
 import { loadMaterialXBackgroundPack, materialXBackgroundPacks } from '../lib/backgrounds'
 import { createBrowserTextureResolver } from '../lib/browser-texture-resolver'
 import { downloadMaterialXZip } from '../lib/materialx-download'
-import { importMaterialXBundle } from '../lib/materialx-import'
+import { importMaterialXBundle, importMaterialXFromUrl } from '../lib/materialx-import'
 import { getMaterialXSamplePacks, loadMaterialXSampleById } from '../lib/materialx-samples.functions'
 import { cn } from '../lib/utils'
 
@@ -24,7 +24,7 @@ interface ViewerTestState {
 export const Route = createFileRoute('/')({
   validateSearch: (search: Record<string, unknown>) => ({
     capture: search.capture === '1' || search.capture === 'true' ? '1' : undefined,
-    material: typeof search.material === 'string' && search.material.length > 0 ? search.material : undefined,
+    material: typeof search.material === 'string' && search.material.length > 0 ? search.material : 'open-pbr-soapbubble',
   }),
   loader: async () => {
     const samplePacks = await getMaterialXSamplePacks()
@@ -198,10 +198,37 @@ function App() {
     [samplePacks],
   )
 
+  const loadFromUrl = useCallback(async (url: string) => {
+    for (const objectUrl of uploadedObjectUrlsRef.current) {
+      URL.revokeObjectURL(objectUrl)
+    }
+    uploadedObjectUrlsRef.current = []
+    setSelectedSample('')
+    try {
+      const bundle = await importMaterialXFromUrl(url)
+      uploadedObjectUrlsRef.current = bundle.objectUrls
+      setSampleLabel(bundle.label)
+      setXml(bundle.xml)
+      setAssetUrls(bundle.assetUrls)
+      setLoadedAssets(Object.keys(bundle.assetUrls))
+    } catch (error) {
+      setXml('')
+      setAssetUrls({})
+      setLoadedAssets([])
+      console.error('Failed to load material from URL:', error)
+    }
+  }, [])
+
+  const isUrl = (value: string): boolean => value.startsWith('http://') || value.startsWith('https://')
+
   useEffect(() => {
     if (!materialParam) return
-    void loadSample(materialParam)
-  }, [materialParam, loadSample])
+    if (isUrl(materialParam)) {
+      void loadFromUrl(materialParam)
+    } else {
+      void loadSample(materialParam)
+    }
+  }, [materialParam, loadSample, loadFromUrl])
 
   const handleDropdownChange = useCallback(
     (sampleId: string) => {

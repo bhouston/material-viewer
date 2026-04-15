@@ -22,16 +22,6 @@ export default function Header() {
               Home
             </Link>
           </Button>
-          <Button asChild size="sm" variant="ghost">
-            <Link
-              activeProps={{ className: 'text-foreground' }}
-              className="text-muted-foreground no-underline"
-              search={{ capture: undefined }}
-              to="/about"
-            >
-              About
-            </Link>
-          </Button>
           <Button asChild size="icon" variant="outline">
             <a
               aria-label="GitHub repository"

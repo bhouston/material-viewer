@@ -20,9 +20,8 @@ export interface ImportedMaterialXBundle {
   objectUrls: string[];
 }
 
-const importFromZip = async (zipFile: File): Promise<ImportedMaterialXBundle> => {
-  const arrayBuffer = await zipFile.arrayBuffer();
-  const zip = await JSZip.loadAsync(arrayBuffer);
+const importFromZipBuffer = async (buffer: ArrayBuffer, label: string): Promise<ImportedMaterialXBundle> => {
+  const zip = await JSZip.loadAsync(buffer);
 
   let mtlxPath: string | undefined;
   let mtlxContent: string | undefined;
@@ -68,9 +67,13 @@ const importFromZip = async (zipFile: File): Promise<ImportedMaterialXBundle> =>
     }
   }
 
-  const label = zipFile.name.replace(/\.zip$/i, '');
-
   return { label, xml: mtlxContent, assetUrls, objectUrls };
+};
+
+const importFromZip = async (zipFile: File): Promise<ImportedMaterialXBundle> => {
+  const buffer = await zipFile.arrayBuffer();
+  const label = zipFile.name.replace(/\.zip$/i, '');
+  return importFromZipBuffer(buffer, label);
 };
 
 export const importMaterialXBundle = async (files: File[]): Promise<ImportedMaterialXBundle> => {
@@ -105,4 +108,39 @@ export const importMaterialXBundle = async (files: File[]): Promise<ImportedMate
     assetUrls,
     objectUrls,
   };
+};
+
+const filenameFromUrl = (url: string): string => {
+  try {
+    const pathname = new URL(url).pathname;
+    const segments = pathname.split('/').filter(Boolean);
+    return segments[segments.length - 1] ?? 'material.mtlx';
+  } catch {
+    return 'material.mtlx';
+  }
+};
+
+export const importMaterialXFromUrl = async (url: string): Promise<ImportedMaterialXBundle> => {
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch ${url}: ${response.status} ${response.statusText}`);
+  }
+
+  const filename = filenameFromUrl(url);
+  const contentType = response.headers.get('content-type') ?? '';
+  const isZip = isZipFile(filename) || contentType.includes('zip') || contentType === 'application/octet-stream' && isZipFile(filename);
+
+  if (isZip) {
+    const buffer = await response.arrayBuffer();
+    const label = filename.replace(/\.zip$/i, '');
+    return importFromZipBuffer(buffer, label);
+  }
+
+  const xml = await response.text();
+  if (!xml.trim()) {
+    throw new Error('Fetched file is empty');
+  }
+
+  const label = filename.replace(/\.mtlx$/i, '') || 'material';
+  return { label, xml, assetUrls: {}, objectUrls: [] };
 };

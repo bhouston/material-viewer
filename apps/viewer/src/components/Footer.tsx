@@ -1,10 +1,29 @@
 export default function Footer() {
   return (
-    <footer className="mt-auto border-t border-border/80 bg-muted/40 px-4 py-4">
-      <div className="page-wrap flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
-        <p className="m-0">Built for MaterialX + Three.js diagnostics.</p>
-        <p className="m-0">Light-mode technical preview</p>
-      </div>
+    <footer className="mt-auto border-t border-border bg-muted/30 px-6 py-4 text-center text-sm text-muted-foreground">
+      Built with{' '}
+      <span aria-hidden="true" className="text-red-500">
+        ♥
+      </span>{' '}
+      by{' '}
+      <a
+        className="underline transition-colors hover:text-foreground"
+        href="https://ben3d.ca"
+        rel="noopener noreferrer"
+        target="_blank"
+      >
+        Ben Houston
+      </a>
+      . Sponsored by{' '}
+      <a
+        className="underline transition-colors hover:text-foreground"
+        href="https://landofassets.com"
+        rel="noopener noreferrer"
+        target="_blank"
+      >
+        Land of Assets
+      </a>
+      .
     </footer>
   )
 }
