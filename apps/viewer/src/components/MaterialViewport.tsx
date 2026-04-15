@@ -17,7 +17,7 @@ import {
 } from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
+import { HDRLoader } from 'three/addons/loaders/HDRLoader.js';
 import type { MeshPhysicalNodeMaterial } from 'three/webgpu';
 import type { MaterialXBackgroundPack } from '../lib/backgrounds';
 
@@ -179,9 +179,9 @@ export default function MaterialViewport({
       keyLight.position.set(2, 3, 4);
       scene.add(keyLight);
 
-      let environmentTexture: Awaited<ReturnType<RGBELoader['loadAsync']>> | undefined;
+      let environmentTexture: Awaited<ReturnType<HDRLoader['loadAsync']>> | undefined;
       try {
-        environmentTexture = await new RGBELoader().loadAsync(ENV_MAP_URL);
+        environmentTexture = await new HDRLoader().loadAsync(ENV_MAP_URL);
         environmentTexture.mapping = EquirectangularReflectionMapping;
         scene.environment = environmentTexture;
       } catch (error) {
