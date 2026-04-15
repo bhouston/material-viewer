@@ -15,7 +15,16 @@ import { createBrowserTextureResolver } from '../lib/browser-texture-resolver'
 import { importMaterialXBundle } from '../lib/materialx-import'
 import { getMaterialXSamplePacks, loadMaterialXSampleById } from '../lib/materialx-samples.functions'
 
+interface ViewerTestState {
+  consoleErrors: string[]
+  uncaughtErrors: string[]
+  failedRequests: string[]
+}
+
 export const Route = createFileRoute('/')({
+  validateSearch: (search: Record<string, unknown>) => ({
+    capture: search.capture === '1' || search.capture === 'true' ? '1' : undefined,
+  }),
   loader: async () => {
     const samplePacks = await getMaterialXSamplePacks()
     const firstSampleId = samplePacks[0]?.id
@@ -27,6 +36,8 @@ export const Route = createFileRoute('/')({
 
 function App() {
   const { samplePacks, initialSample } = Route.useLoaderData()
+  const { capture } = Route.useSearch()
+  const captureMode = capture === '1'
   const hydrated = useHydrated()
   const [selectedSample, setSelectedSample] = useState(samplePacks[0]?.id ?? '')
   const [xml, setXml] = useState(initialSample?.xml ?? '')
@@ -40,6 +51,65 @@ function App() {
   const [dropMessage, setDropMessage] = useState('Drop a .mtlx and related textures, or click to select files')
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const uploadedObjectUrlsRef = useRef<string[]>([])
+
+  useEffect(() => {
+    if (!captureMode || !hydrated || typeof window === 'undefined') {
+      return
+    }
+
+    const scopedWindow = window as Window & { __viewerTestState?: ViewerTestState }
+    const state: ViewerTestState = {
+      consoleErrors: [],
+      uncaughtErrors: [],
+      failedRequests: [],
+    }
+    scopedWindow.__viewerTestState = state
+
+    const originalConsoleError = console.error
+    const originalFetch = window.fetch.bind(window)
+    const stringifyError = (value: unknown): string => {
+      if (value instanceof Error) {
+        return value.message
+      }
+      if (typeof value === 'string') {
+        return value
+      }
+      return JSON.stringify(value)
+    }
+    console.error = (...args: unknown[]) => {
+      state.consoleErrors.push(args.map((arg) => stringifyError(arg)).join(' '))
+      originalConsoleError(...args)
+    }
+    const handleError = (event: ErrorEvent) => {
+      state.uncaughtErrors.push(event.message || stringifyError(event.error))
+    }
+    const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
+      state.uncaughtErrors.push(`Unhandled rejection: ${stringifyError(event.reason)}`)
+    }
+
+    window.fetch = async (...args: Parameters<typeof window.fetch>) => {
+      try {
+        const response = await originalFetch(...args)
+        if (!response.ok) {
+          state.failedRequests.push(`${response.status} ${String(args[0])}`)
+        }
+        return response
+      } catch (error) {
+        state.failedRequests.push(`network-error ${String(args[0])}: ${stringifyError(error)}`)
+        throw error
+      }
+    }
+
+    window.addEventListener('error', handleError)
+    window.addEventListener('unhandledrejection', handleUnhandledRejection)
+
+    return () => {
+      console.error = originalConsoleError
+      window.fetch = originalFetch
+      window.removeEventListener('error', handleError)
+      window.removeEventListener('unhandledrejection', handleUnhandledRejection)
+    }
+  }, [captureMode, hydrated])
 
   useEffect(() => {
     return () => {
@@ -83,6 +153,9 @@ function App() {
       }
     }
   }, [assetUrls, hydrated, xml])
+  const warningCount = compileState.result?.warnings.length ?? 0
+  const unsupportedCategoryCount = compileState.result?.unsupportedCategories.length ?? 0
+  const unsupportedWarningCount = (compileState.result?.warnings ?? []).filter((warning) => warning.code === 'unsupported-node').length
 
   const backgroundCompileState = useMemo(() => {
     if (!hydrated) {
@@ -235,6 +308,7 @@ function App() {
                 <Label htmlFor="sample">Built-in sample</Label>
                 <Select
                   className="min-w-[280px]"
+                  data-testid="sample-select"
                   id="sample"
                   onChange={(event) => {
                     void handleSampleChange(event.target.value)
@@ -242,7 +316,7 @@ function App() {
                   value={selectedSample}
                 >
                   {samplePacks.map((sample) => (
-                    <option key={sample.id} value={sample.id}>
+                    <option key={sample.id} data-directory={sample.directory} value={sample.id}>
                       {sample.label}
                     </option>
                   ))}
@@ -272,39 +346,56 @@ function App() {
                 />
                 <div className="space-y-1">
                   <p className="m-0 text-sm font-semibold">Drag and drop files</p>
-                  <p className="m-0 text-xs font-normal text-muted-foreground">{dropMessage}</p>
+                  <p className="m-0 text-xs font-normal text-muted-foreground" data-testid="drop-message">
+                    {dropMessage}
+                  </p>
                 </div>
               </Button>
               <div className="panel-muted px-3 py-2 text-xs text-muted-foreground">
-                Active source: <code>{sampleLabel}</code>
+                Active source: <code data-testid="active-source-label">{sampleLabel}</code>
               </div>
             </CardContent>
           </Card>
 
-          <ClientOnly
-            fallback={
-              <Card className="panel-surface">
-                <CardHeader>
-                  <CardTitle className="text-base">Preview</CardTitle>
-                  <CardDescription>Initializing 3D viewport...</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="h-[420px] w-full rounded-lg border border-border/90 bg-muted/40" />
-                </CardContent>
-              </Card>
-            }
-          >
+          {captureMode ? (
             <MaterialViewport
               backgroundError={backgroundError ?? backgroundCompileState.error}
               backgroundMaterial={backgroundCompileState.material}
               backgroundPacks={materialXBackgroundPacks}
+              captureMode={captureMode}
               nodeMaterial={compileState.material}
               onBackgroundChange={(backgroundId) => {
                 void handleBackgroundChange(backgroundId)
               }}
               selectedBackground={selectedBackground}
             />
-          </ClientOnly>
+          ) : (
+            <ClientOnly
+              fallback={
+                <Card className="panel-surface">
+                  <CardHeader>
+                    <CardTitle className="text-base">Preview</CardTitle>
+                    <CardDescription>Initializing 3D viewport...</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="h-[420px] w-full rounded-lg border border-border/90 bg-muted/40" />
+                  </CardContent>
+                </Card>
+              }
+            >
+              <MaterialViewport
+                backgroundError={backgroundError ?? backgroundCompileState.error}
+                backgroundMaterial={backgroundCompileState.material}
+                backgroundPacks={materialXBackgroundPacks}
+                captureMode={captureMode}
+                nodeMaterial={compileState.material}
+                onBackgroundChange={(backgroundId) => {
+                  void handleBackgroundChange(backgroundId)
+                }}
+                selectedBackground={selectedBackground}
+              />
+            </ClientOnly>
+          )}
 
           <Card className="panel-surface">
             <CardHeader>
@@ -323,14 +414,23 @@ function App() {
           </Card>
         </div>
 
-        <Card className="panel-surface h-fit">
+        <Card
+          className="panel-surface h-fit"
+          data-compile-error={compileState.error ? '1' : '0'}
+          data-testid="compile-diagnostics"
+          data-unsupported-category-count={unsupportedCategoryCount}
+          data-unsupported-warning-count={unsupportedWarningCount}
+          data-warning-count={warningCount}
+        >
           <CardHeader>
             <CardTitle className="text-base">Compilation Diagnostics</CardTitle>
             <CardDescription>Inspect compiler output, warnings, unsupported categories, and imported assets.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4 text-sm">
             {compileState.error ? (
-              <p className="m-0 text-destructive">{compileState.error}</p>
+              <p className="m-0 text-destructive" data-testid="compile-error-message">
+                {compileState.error}
+              </p>
             ) : (
               <>
                 <div className="space-y-2">
@@ -341,12 +441,18 @@ function App() {
                     Surface shader: <code>{compileState.result?.surfaceShaderName ?? 'n/a'}</code>
                   </p>
                   <p className="m-0">Supported in document: {compileState.result?.supportedCategories.length ?? 0}</p>
-                  <p className="m-0">Unsupported in document: {compileState.result?.unsupportedCategories.length ?? 0}</p>
-                  <p className="m-0">Related assets available: {loadedAssets.length}</p>
+                  <p className="m-0" data-testid="unsupported-category-count">
+                    Unsupported in document: {unsupportedCategoryCount}
+                  </p>
+                  <p className="m-0" data-testid="loaded-assets-count">
+                    Related assets available: {loadedAssets.length}
+                  </p>
                 </div>
                 <Separator />
                 <details>
-                  <summary className="cursor-pointer font-medium">Warnings ({compileState.result?.warnings.length ?? 0})</summary>
+                  <summary className="cursor-pointer font-medium" data-testid="warnings-summary">
+                    Warnings ({warningCount})
+                  </summary>
                   <ul className="m-0 mt-2 space-y-1 pl-5">
                     {(compileState.result?.warnings ?? []).map((warning) => (
                       <li key={`${warning.code}-${warning.nodeName ?? warning.message}`}>{warning.message}</li>
