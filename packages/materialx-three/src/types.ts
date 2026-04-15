@@ -26,6 +26,7 @@ export interface MaterialXThreeCompileOptions {
 
 export interface MaterialSlotAssignments {
   colorNode?: unknown;
+  aoNode?: unknown;
   roughnessNode?: unknown;
   metalnessNode?: unknown;
   specularIntensityNode?: unknown;
@@ -41,6 +42,8 @@ export interface MaterialSlotAssignments {
   emissiveNode?: unknown;
   opacityNode?: unknown;
   transmissionNode?: unknown;
+  thicknessNode?: unknown;
+  dispersionNode?: unknown;
   attenuationColorNode?: unknown;
   attenuationDistanceNode?: unknown;
   iorNode?: unknown;

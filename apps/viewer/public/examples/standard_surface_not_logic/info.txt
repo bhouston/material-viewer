@@ -1,0 +1,1 @@
+Logical Not (inverted circle mask)

@@ -22,9 +22,11 @@ const toOpacityScalar = (opacity: unknown): unknown => {
   return dot(opacity as never, vec3(0.2126, 0.7152, 0.0722));
 };
 
-const toAttenuationDistance = (depth: unknown): unknown => {
+const toAttenuationDistance = (depth: unknown, hasTransmissionColorInput: boolean): unknown => {
   if (depth === undefined) {
-    return undefined;
+    // When transmission tint is authored without depth, default to a finite
+    // distance so attenuation visibly contributes instead of acting clear.
+    return hasTransmissionColorInput ? 1 : undefined;
   }
   if (typeof depth === 'number') {
     return depth > 0 ? depth : undefined;
@@ -57,6 +59,7 @@ export const buildStandardSurfaceAssignments = (
   const opacity = helpers.getInputNode(surfaceNode, 'opacity', undefined);
   const hasTransmission = hasInput('transmission');
   const transmission = hasTransmission ? helpers.getInputNode(surfaceNode, 'transmission', 0) : undefined;
+  const hasTransmissionColorInput = hasInput('transmission_color');
   const transmissionColor = hasTransmission ? helpers.getInputNode(surfaceNode, 'transmission_color', [1, 1, 1]) : undefined;
   const transmissionDepth = hasInput('transmission_depth')
     ? helpers.getInputNode(surfaceNode, 'transmission_depth', undefined)
@@ -71,13 +74,19 @@ export const buildStandardSurfaceAssignments = (
   const normal = helpers.getInputNode(surfaceNode, 'normal', undefined);
 
   const baseLayerColor = mul(baseColor as never, base as never);
+  // Standard Surface "base" controls diffuse only; with transmission-heavy
+  // materials (e.g. glass) base is commonly zero and should not black out the
+  // transmitted result in Three's physical model.
+  const transmissionSafeBaseColor = hasTransmission
+    ? mix(baseLayerColor as never, vec3(1, 1, 1) as never, transmission as never)
+    : baseLayerColor;
   // StandardSurface copper/brass examples tint via coat_color even when base_color is white.
   const coatTint = mix(vec3(1, 1, 1), coatColor as never, coat as never);
-  const colorNode = mul(baseLayerColor as never, coatTint as never);
+  const colorNode = mul(transmissionSafeBaseColor as never, coatTint as never);
   const emissiveNode = multiplyNodeValues(emissionColor, emissionAmount);
   const sheenNode = multiplyNodeValues(sheenColor, sheen);
   const opacityNode = opacity === undefined ? undefined : toOpacityScalar(opacity);
-  const attenuationDistanceNode = toAttenuationDistance(transmissionDepth);
+  const attenuationDistanceNode = toAttenuationDistance(transmissionDepth, hasTransmissionColorInput);
   // StandardSurface has no explicit thin-film weight. Derive a 0/1 iridescence
   // enable signal from thickness so this aligns with glTF/Three semantics.
   const thinFilmEnabled = step(0.0001, thinFilmThickness as never);

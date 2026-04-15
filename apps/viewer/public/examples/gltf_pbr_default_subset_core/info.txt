@@ -1,0 +1,1 @@
+glTF PBR default subset 1: core base/metal/roughness

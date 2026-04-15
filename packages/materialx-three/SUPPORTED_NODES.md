@@ -5,8 +5,8 @@ Generated from `@materialx-js/materialx` node registry.
 ## Summary
 
 - Total categories in registry: 223
-- Supported categories: 117
-- Unsupported categories: 106
+- Supported categories: 122
+- Unsupported categories: 101
 
 ## Supported
 
@@ -64,6 +64,7 @@ Generated from `@materialx-js/materialx` node registry.
 - `ifgreatereq`
 - `image`
 - `invert`
+- `invertmatrix`
 - `ln`
 - `luminance`
 - `magnitude`
@@ -78,6 +79,7 @@ Generated from `@materialx-js/materialx` node registry.
 - `normal`
 - `normalize`
 - `normalmap`
+- `not`
 - `open_pbr_anisotropy`
 - `open_pbr_surface`
 - `or`
@@ -85,6 +87,9 @@ Generated from `@materialx-js/materialx` node registry.
 - `place2d`
 - `position`
 - `power`
+- `ramp`
+- `ramp4`
+- `ramp_gradient`
 - `ramplr`
 - `ramptb`
 - `range`
@@ -186,7 +191,6 @@ Generated from `@materialx-js/materialx` node registry.
 - `hsvadjust`
 - `in`
 - `inside`
-- `invertmatrix`
 - `latlongimage`
 - `layer`
 - `light`
@@ -197,7 +201,6 @@ Generated from `@materialx-js/materialx` node registry.
 - `matte`
 - `measured_edf`
 - `nodegraph`
-- `not`
 - `open_pbr_surface_to_standard_surface`
 - `oren_nayar_diffuse_bsdf`
 - `osl_set_ci`
@@ -208,9 +211,6 @@ Generated from `@materialx-js/materialx` node registry.
 - `plus`
 - `point_light`
 - `premult`
-- `ramp`
-- `ramp4`
-- `ramp_gradient`
 - `randomcolor`
 - `randomfloat`
 - `rec709_display_to_lin_rec709`

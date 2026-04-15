@@ -117,4 +117,9 @@ export const supportedNodeCategories = new Set([
   'transformnormal',
   'transformpoint',
   'transformvector',
+  'invertmatrix',
+  'not',
+  'ramp4',
+  'ramp_gradient',
+  'ramp',
 ]);

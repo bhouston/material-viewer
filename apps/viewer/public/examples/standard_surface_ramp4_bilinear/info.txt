@@ -1,0 +1,1 @@
+Ramp4 Bilinear (four-corner color gradient)

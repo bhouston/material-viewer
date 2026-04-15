@@ -9,9 +9,11 @@ export interface GltfPbrSurfaceInputs {
 const multiplyNodeValues = (left: unknown, right: unknown): unknown =>
   (left as { mul?: (other: unknown) => unknown }).mul?.(right) ?? mul(left as never, right as never);
 
-const toAttenuationDistance = (distance: unknown): unknown => {
+const toAttenuationDistance = (distance: unknown, hasAttenuationColorInput: boolean): unknown => {
   if (distance === undefined) {
-    return undefined;
+    // When attenuation tint is authored without a distance, default to a
+    // finite value so absorption tinting is visible.
+    return hasAttenuationColorInput ? 1 : undefined;
   }
   if (typeof distance === 'number') {
     return distance > 0 ? distance : undefined;
@@ -41,6 +43,7 @@ export const buildGltfPbrSurfaceAssignments = (
 ): MaterialSlotAssignments => {
   const hasInput = (name: string) => surfaceNode.inputs.some((input) => input.name === name);
   const baseColor = helpers.getInputNode(surfaceNode, 'base_color', [1, 1, 1]);
+  const occlusion = hasInput('occlusion') ? helpers.getInputNode(surfaceNode, 'occlusion', 1) : undefined;
   const roughness = helpers.getInputNode(surfaceNode, 'roughness', 1);
   const metallic = helpers.getInputNode(surfaceNode, 'metallic', 1);
   const normal = helpers.getInputNode(surfaceNode, 'normal', undefined);
@@ -73,6 +76,8 @@ export const buildGltfPbrSurfaceAssignments = (
   const attenuationColor = hasInput('attenuation_color')
     ? helpers.getInputNode(surfaceNode, 'attenuation_color', [1, 1, 1])
     : undefined;
+  const thickness = hasInput('thickness') ? helpers.getInputNode(surfaceNode, 'thickness', 0) : undefined;
+  const dispersion = hasInput('dispersion') ? helpers.getInputNode(surfaceNode, 'dispersion', 0) : undefined;
   const anisotropyStrength = hasInput('anisotropy_strength')
     ? helpers.getInputNode(surfaceNode, 'anisotropy_strength', 0)
     : undefined;
@@ -82,11 +87,12 @@ export const buildGltfPbrSurfaceAssignments = (
 
   const emissiveNode = multiplyNodeValues(emissiveColor, emissiveStrength);
   const opacityNode = buildOpacityNode(alpha, alphaMode, alphaCutoff);
-  const attenuationDistanceNode = toAttenuationDistance(attenuationDistance);
+  const attenuationDistanceNode = toAttenuationDistance(attenuationDistance, hasInput('attenuation_color'));
   const iridescenceThicknessNode = toIridescenceThicknessNode(iridescenceThickness);
 
   return {
     colorNode: baseColor,
+    aoNode: occlusion,
     roughnessNode: roughness,
     metalnessNode: metallic,
     specularIntensityNode: specular,
@@ -102,6 +108,8 @@ export const buildGltfPbrSurfaceAssignments = (
     emissiveNode,
     opacityNode,
     transmissionNode: transmission,
+    thicknessNode: thickness,
+    dispersionNode: dispersion,
     attenuationColorNode: attenuationColor,
     attenuationDistanceNode,
     iorNode: ior,

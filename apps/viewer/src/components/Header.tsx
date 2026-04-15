@@ -17,11 +17,6 @@ export default function Header() {
         </Link>
 
         <div className="ml-auto flex items-center gap-1">
-          <Button asChild size="sm" variant="ghost">
-            <Link activeProps={{ className: 'text-foreground' }} className="text-muted-foreground no-underline" search={{ capture: undefined, material: undefined }} to="/">
-              Home
-            </Link>
-          </Button>
           <Button asChild size="icon" variant="outline">
             <a
               aria-label="GitHub repository"

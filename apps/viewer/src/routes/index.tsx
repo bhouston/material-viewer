@@ -24,7 +24,7 @@ interface ViewerTestState {
 export const Route = createFileRoute('/')({
   validateSearch: (search: Record<string, unknown>) => ({
     capture: search.capture === '1' || search.capture === 'true' ? '1' : undefined,
-    material: typeof search.material === 'string' && search.material.length > 0 ? search.material : 'open-pbr-soapbubble',
+    material: typeof search.material === 'string' && search.material.length > 0 ? search.material : undefined,
   }),
   loader: async () => {
     const samplePacks = await getMaterialXSamplePacks()
@@ -221,12 +221,15 @@ function App() {
 
   const isUrl = (value: string): boolean => value.startsWith('http://') || value.startsWith('https://')
 
+  const DEFAULT_MATERIAL = 'open-pbr-soapbubble'
+
   useEffect(() => {
-    if (!materialParam) return
-    if (isUrl(materialParam)) {
-      void loadFromUrl(materialParam)
+    const resolved = materialParam ?? DEFAULT_MATERIAL
+    if (resolved === 'none') return
+    if (isUrl(resolved)) {
+      void loadFromUrl(resolved)
     } else {
-      void loadSample(materialParam)
+      void loadSample(resolved)
     }
   }, [materialParam, loadSample, loadFromUrl])
 
@@ -244,7 +247,7 @@ function App() {
           URL.revokeObjectURL(objectUrl)
         }
         uploadedObjectUrlsRef.current = []
-        void navigate({ to: '/', search: { capture, material: undefined } })
+        void navigate({ to: '/', search: { capture, material: 'none' } })
       }
     },
     [navigate, capture],
@@ -359,8 +362,8 @@ function App() {
           onChange={(event) => handleDropdownChange(event.target.value)}
           value={selectedSample}
         >
-          <option value="">Select a material...</option>
-          {samplePacks.map((sample) => (
+          <option value="">None</option>
+          {[...samplePacks].sort((a, b) => a.directory.localeCompare(b.directory)).map((sample) => (
             <option key={sample.id} data-directory={sample.directory} value={sample.id}>
               {sample.directory}
             </option>

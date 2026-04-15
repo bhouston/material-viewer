@@ -30,12 +30,17 @@ export const createThreeMaterialFromDocument = (
   const material = new MeshPhysicalNodeMaterial();
   const opacityAssignment = result.assignments.opacityNode;
   const transmissionAssignment = result.assignments.transmissionNode;
+  const opacityLiteral = readNumberLiteral(opacityAssignment);
+  const transmissionLiteral = readNumberLiteral(transmissionAssignment);
   const hasTransmission =
-    transmissionAssignment !== undefined && (typeof transmissionAssignment !== 'number' || transmissionAssignment > 0.0001);
-  const hasFractionalOpacity = typeof opacityAssignment === 'number' ? opacityAssignment < 0.9999 : opacityAssignment !== undefined;
+    transmissionAssignment !== undefined && (transmissionLiteral === undefined ? true : transmissionLiteral > 0.0001);
+  const hasFractionalOpacity = opacityAssignment !== undefined && (opacityLiteral === undefined ? true : opacityLiteral < 0.9999);
 
   material.color = new Color(1, 1, 1);
   material.colorNode = result.assignments.colorNode as never;
+  if (result.assignments.aoNode !== undefined) {
+    material.aoNode = result.assignments.aoNode as never;
+  }
   material.roughnessNode = result.assignments.roughnessNode as never;
   material.metalnessNode = result.assignments.metalnessNode as never;
   material.specularIntensityNode = result.assignments.specularIntensityNode as never;
@@ -55,13 +60,23 @@ export const createThreeMaterialFromDocument = (
   material.opacityNode = opacityAssignment as never;
   material.transparent = hasTransmission ? true : hasFractionalOpacity;
   material.transmissionNode = transmissionAssignment as never;
+  if (result.assignments.thicknessNode !== undefined) {
+    material.thicknessNode = result.assignments.thicknessNode as never;
+  } else if (hasTransmission) {
+    // Default transmissive materials to non-zero volume so attenuation/tint
+    // can participate even when source data omits explicit thickness.
+    material.thickness = 1;
+  }
+  if (result.assignments.dispersionNode !== undefined) {
+    material.dispersionNode = result.assignments.dispersionNode as never;
+  }
   if (hasTransmission) {
     // Keep the non-node scalar enabled so Three routes the material through
     // its transmission render path in both WebGL and WebGPU backends.
-    material.transmission = typeof transmissionAssignment === 'number' ? transmissionAssignment : 1;
+    material.transmission = transmissionLiteral ?? 1;
     material.opacity = 1;
-  } else if (typeof opacityAssignment === 'number') {
-    material.opacity = opacityAssignment;
+  } else if (opacityLiteral !== undefined) {
+    material.opacity = opacityLiteral;
   }
   material.attenuationColorNode = result.assignments.attenuationColorNode as never;
   material.attenuationDistanceNode = result.assignments.attenuationDistanceNode as never;

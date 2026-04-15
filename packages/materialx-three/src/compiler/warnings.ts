@@ -72,7 +72,7 @@ export const warnOpenPbrLimitations = (surfaceNode: MaterialXNode, context: Comp
 };
 
 export const warnGltfPbrLimitations = (surfaceNode: MaterialXNode, context: CompileContext): void => {
-  const unsupportedInputs = ['occlusion', 'tangent', 'dispersion', 'thickness'];
+  const unsupportedInputs = ['tangent'];
   const activeUnsupportedInputs = unsupportedInputs.filter((name) => {
     const input = readInput(surfaceNode, name);
     if (!input) {
@@ -88,6 +88,6 @@ export const warnGltfPbrLimitations = (surfaceNode: MaterialXNode, context: Comp
   warn(context, {
     code: 'unsupported-node',
     nodeName: surfaceNode.name,
-    message: `glTF PBR inputs currently map to core MeshPhysical slots only; these inputs are ignored (${activeUnsupportedInputs.join(', ')})`,
+    message: `glTF PBR extension inputs are not yet mapped and are ignored (${activeUnsupportedInputs.join(', ')})`,
   });
 };

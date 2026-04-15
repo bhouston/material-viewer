@@ -237,12 +237,131 @@ describe('materialx-three compiler', () => {
     const result = compileFixture(gltfPbrDefaultFixture);
     expect(result.surfaceShaderName).toBe('SR_default');
     expect(result.assignments.colorNode).toBeDefined();
+    expect(result.assignments.aoNode).toBeDefined();
     expect(result.assignments.roughnessNode).toBeDefined();
     expect(result.assignments.metalnessNode).toBeDefined();
     expect(result.assignments.opacityNode).toBeDefined();
     expect(result.assignments.transmissionNode).toBeDefined();
+    expect(result.assignments.thicknessNode).toBeDefined();
     expect(result.assignments.iorNode).toBeDefined();
+    expect(
+      result.warnings.some((entry) => entry.code === 'unsupported-node' && entry.nodeName === result.surfaceShaderName)
+    ).toBe(false);
     expectCategoriesSupported(result, ['gltf_pbr']);
+
+    const xml = readFileSync(gltfPbrDefaultFixture, 'utf8');
+    const compiled = createThreeMaterialFromDocument(parseMaterialX(xml));
+    expect(compiled.material.aoNode).toBeDefined();
+    expect(compiled.material.thicknessNode).toBeDefined();
+  });
+
+  it('maps gltf_pbr dispersion input to physical dispersion slot', () => {
+    const xml = `<?xml version="1.0"?>
+<materialx version="1.39" colorspace="lin_rec709">
+  <gltf_pbr name="SR_Dispersion" type="surfaceshader">
+    <input name="base_color" type="color3" value="1.0, 1.0, 1.0" />
+    <input name="metallic" type="float" value="0.0" />
+    <input name="roughness" type="float" value="0.2" />
+    <input name="transmission" type="float" value="1.0" />
+    <input name="ior" type="float" value="1.5" />
+    <input name="dispersion" type="float" value="0.35" />
+  </gltf_pbr>
+  <surfacematerial name="M_Dispersion" type="material">
+    <input name="surfaceshader" type="surfaceshader" nodename="SR_Dispersion" />
+  </surfacematerial>
+</materialx>`;
+
+    const document = parseMaterialX(xml);
+    const result = compileMaterialXToTSL(document);
+    expect(result.assignments.dispersionNode).toBeDefined();
+    expect(result.warnings.some((entry) => entry.code === 'unsupported-node' && entry.message.includes('dispersion'))).toBe(
+      false
+    );
+
+    const compiled = createThreeMaterialFromDocument(document);
+    expect(compiled.material.dispersionNode).toBeDefined();
+  });
+
+  it('does not force transmissive rendering when gltf_pbr transmission is zero', () => {
+    const xml = `<?xml version="1.0"?>
+<materialx version="1.39" colorspace="lin_rec709">
+  <gltf_pbr name="SR_TransmissionZero" type="surfaceshader">
+    <input name="base_color" type="color3" value="1.0, 1.0, 1.0" />
+    <input name="metallic" type="float" value="0.0" />
+    <input name="roughness" type="float" value="0.4" />
+    <input name="transmission" type="float" value="0.0" />
+    <input name="ior" type="float" value="1.5" />
+    <input name="thickness" type="float" value="1.0" />
+  </gltf_pbr>
+  <surfacematerial name="M_TransmissionZero" type="material">
+    <input name="surfaceshader" type="surfaceshader" nodename="SR_TransmissionZero" />
+  </surfacematerial>
+</materialx>`;
+    const compiled = createThreeMaterialFromDocument(parseMaterialX(xml));
+    expect(compiled.material.transparent).toBe(false);
+    expect(compiled.material.transmission).toBe(0);
+  });
+
+  it('defaults thickness to 1 when transmission is enabled without thickness input', () => {
+    const xml = `<?xml version="1.0"?>
+<materialx version="1.39" colorspace="lin_rec709">
+  <open_pbr_surface name="SR_OpenPbrHoneyLike" type="surfaceshader">
+    <input name="base_color" type="color3" value="1.0, 1.0, 1.0" />
+    <input name="specular_roughness" type="float" value="0.0" />
+    <input name="specular_ior" type="float" value="1.504" />
+    <input name="transmission_weight" type="float" value="1.0" />
+    <input name="transmission_color" type="color3" value="0.83, 0.4, 0.04" />
+    <input name="transmission_depth" type="float" value="2.0" />
+  </open_pbr_surface>
+  <surfacematerial name="M_OpenPbrHoneyLike" type="material">
+    <input name="surfaceshader" type="surfaceshader" nodename="SR_OpenPbrHoneyLike" />
+  </surfacematerial>
+</materialx>`;
+    const compiled = createThreeMaterialFromDocument(parseMaterialX(xml));
+    expect(compiled.result.assignments.thicknessNode).toBeUndefined();
+    expect(compiled.material.thicknessNode).toBeNull();
+    expect(compiled.material.thickness).toBe(1);
+    expect(compiled.material.transmission).toBe(1);
+  });
+
+  it('defaults standard_surface attenuation distance to 1 when transmission_color is authored without transmission_depth', () => {
+    const xml = `<?xml version="1.0"?>
+<materialx version="1.39" colorspace="lin_rec709">
+  <standard_surface name="SR_StdTintedTransmission" type="surfaceshader">
+    <input name="base" type="float" value="0.0" />
+    <input name="specular" type="float" value="1.0" />
+    <input name="specular_roughness" type="float" value="0.05" />
+    <input name="transmission" type="float" value="1.0" />
+    <input name="transmission_color" type="color3" value="0.9, 0.6, 0.2" />
+  </standard_surface>
+  <surfacematerial name="M_StdTintedTransmission" type="material">
+    <input name="surfaceshader" type="surfaceshader" nodename="SR_StdTintedTransmission" />
+  </surfacematerial>
+</materialx>`;
+    const compiled = createThreeMaterialFromDocument(parseMaterialX(xml));
+    expect(compiled.result.assignments.attenuationColorNode).toBeDefined();
+    expect(compiled.result.assignments.attenuationDistanceNode).toBe(1);
+    expect(compiled.material.attenuationDistanceNode).toBe(1);
+  });
+
+  it('defaults gltf_pbr attenuation distance to 1 when attenuation_color is authored without attenuation_distance', () => {
+    const xml = `<?xml version="1.0"?>
+<materialx version="1.39" colorspace="lin_rec709">
+  <gltf_pbr name="SR_GltfTintedTransmission" type="surfaceshader">
+    <input name="base_color" type="color3" value="1.0, 1.0, 1.0" />
+    <input name="metallic" type="float" value="0.0" />
+    <input name="roughness" type="float" value="0.0" />
+    <input name="transmission" type="float" value="1.0" />
+    <input name="attenuation_color" type="color3" value="0.95, 0.7, 0.3" />
+  </gltf_pbr>
+  <surfacematerial name="M_GltfTintedTransmission" type="material">
+    <input name="surfaceshader" type="surfaceshader" nodename="SR_GltfTintedTransmission" />
+  </surfacematerial>
+</materialx>`;
+    const compiled = createThreeMaterialFromDocument(parseMaterialX(xml));
+    expect(compiled.result.assignments.attenuationColorNode).toBeDefined();
+    expect(compiled.result.assignments.attenuationDistanceNode).toBe(1);
+    expect(compiled.material.attenuationDistanceNode).toBe(1);
   });
 
   it('supports broad gltf_* texture node coverage used by boombox fixture', () => {

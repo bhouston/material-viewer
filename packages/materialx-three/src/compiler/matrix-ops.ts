@@ -1,4 +1,4 @@
-import { add, mul, sub, vec2, vec3, vec4 } from 'three/tsl';
+import { add, div, mul, sub, vec2, vec3, vec4 } from 'three/tsl';
 import type { MatrixValue } from './internal-types.js';
 import { asMatrixValue } from './value-coercion.js';
 
@@ -23,13 +23,15 @@ export const outputNameToChannelIndex = (outputName?: string): number => {
 };
 
 export const getNodeChannel = (node: unknown, index: number): unknown => {
-  const channels = ['x', 'y', 'z', 'w'];
-  const channel = channels[index];
-  if (!channel) {
+  const xyzwChannels = ['x', 'y', 'z', 'w'];
+  const rgbaChannels = ['r', 'g', 'b', 'a'];
+  const xyzwChannel = xyzwChannels[index];
+  const rgbaChannel = rgbaChannels[index];
+  if (!xyzwChannel) {
     return node;
   }
   const entry = node as Record<string, unknown>;
-  return entry[channel] ?? node;
+  return entry[xyzwChannel] ?? (rgbaChannel ? entry[rgbaChannel] : undefined) ?? node;
 };
 
 export const toVectorComponents = (value: unknown, size: number, fallback: number[]): unknown[] => {
@@ -139,6 +141,76 @@ export const det4 = (matrix: unknown[][]): unknown => {
   const term3 = mul(m03 as never, minor3 as never);
   return sub(add(sub(term0 as never, term1 as never) as never, term2 as never) as never, term3 as never);
 };
+
+const invertMatrix3 = (matrix: MatrixValue): MatrixValue => {
+  const m = matrix.values;
+  const a = m[0]?.[0] ?? 0;
+  const b = m[0]?.[1] ?? 0;
+  const c = m[0]?.[2] ?? 0;
+  const d = m[1]?.[0] ?? 0;
+  const e = m[1]?.[1] ?? 0;
+  const f = m[1]?.[2] ?? 0;
+  const g = m[2]?.[0] ?? 0;
+  const h = m[2]?.[1] ?? 0;
+  const i = m[2]?.[2] ?? 0;
+
+  const determinant = det3(m);
+
+  const cofactor00 = det2(e, f, h, i);
+  const cofactor01 = sub(0 as never, det2(d, f, g, i) as never);
+  const cofactor02 = det2(d, e, g, h);
+  const cofactor10 = sub(0 as never, det2(b, c, h, i) as never);
+  const cofactor11 = det2(a, c, g, i);
+  const cofactor12 = sub(0 as never, det2(a, b, g, h) as never);
+  const cofactor20 = det2(b, c, e, f);
+  const cofactor21 = sub(0 as never, det2(a, c, d, f) as never);
+  const cofactor22 = det2(a, b, d, e);
+
+  const invDet = div(1 as never, determinant as never);
+  return {
+    kind: 'matrix33',
+    values: [
+      [mul(cofactor00 as never, invDet as never), mul(cofactor10 as never, invDet as never), mul(cofactor20 as never, invDet as never)],
+      [mul(cofactor01 as never, invDet as never), mul(cofactor11 as never, invDet as never), mul(cofactor21 as never, invDet as never)],
+      [mul(cofactor02 as never, invDet as never), mul(cofactor12 as never, invDet as never), mul(cofactor22 as never, invDet as never)],
+    ],
+  };
+};
+
+const minor3 = (m: unknown[][], row: number, col: number): unknown => {
+  const rows: unknown[][] = [];
+  for (let r = 0; r < 4; r += 1) {
+    if (r === row) continue;
+    const rowVals: unknown[] = [];
+    for (let c = 0; c < 4; c += 1) {
+      if (c === col) continue;
+      rowVals.push(m[r]?.[c] ?? 0);
+    }
+    rows.push(rowVals);
+  }
+  return det3(rows);
+};
+
+const invertMatrix4 = (matrix: MatrixValue): MatrixValue => {
+  const m = matrix.values;
+  const determinant = det4(m);
+  const invDet = div(1 as never, determinant as never);
+
+  const values: unknown[][] = [];
+  for (let row = 0; row < 4; row += 1) {
+    const resultRow: unknown[] = [];
+    for (let col = 0; col < 4; col += 1) {
+      const cofactor = minor3(m, col, row);
+      const sign = (col + row) % 2 === 0 ? cofactor : sub(0 as never, cofactor as never);
+      resultRow.push(mul(sign as never, invDet as never));
+    }
+    values.push(resultRow);
+  }
+  return { kind: 'matrix44', values };
+};
+
+export const invertMatrix = (matrix: MatrixValue): MatrixValue =>
+  matrix.kind === 'matrix33' ? invertMatrix3(matrix) : invertMatrix4(matrix);
 
 export const applyMatrixTransform = (
   inputValue: unknown,

@@ -78,6 +78,7 @@ import {
   det3,
   det4,
   getNodeChannel,
+  invertMatrix,
   makeVectorFromComponents,
   outputNameToChannelIndex,
   toVectorComponents,
@@ -864,6 +865,148 @@ export const buildNodeHandlerRegistry = (deps: NodeHandlerDeps): Map<string, Nod
     const k2 = max(div(k2Numerator as never, sub(float(1), clamped as never) as never) as never, vec3(0, 0, 0) as never);
     const extinction = sqrt(k2 as never);
     return outputName === 'extinction' ? extinction : ior;
+  });
+
+  map.set('invertmatrix', (node, context, scopeGraph) => {
+    const kind = node.type === 'matrix33' ? 'matrix33' : 'matrix44';
+    const inMatrix = r(node, 'in', matrixIdentity(kind), context, scopeGraph);
+    const matrix = asMatrixValue(inMatrix, kind);
+    return invertMatrix(matrix);
+  });
+
+  map.set('not', (node, context, scopeGraph) => {
+    const inNode = r(node, 'in', 0, context, scopeGraph);
+    return sub(float(1), inNode as never);
+  });
+
+  map.set('ramp4', (node, context, scopeGraph) => {
+    const valuetl = r(node, 'valuetl', 0, context, scopeGraph);
+    const valuetr = r(node, 'valuetr', 0, context, scopeGraph);
+    const valuebl = r(node, 'valuebl', 0, context, scopeGraph);
+    const valuebr = r(node, 'valuebr', 0, context, scopeGraph);
+    const texcoord = r(node, 'texcoord', uv(0), context, scopeGraph);
+    const clamped = clamp(texcoord as never, vec2(0, 0) as never, vec2(1, 1) as never);
+    const s = getNodeChannel(clamped, 0);
+    const t = getNodeChannel(clamped, 1);
+    const topMix = mix(valuetl as never, valuetr as never, s as never);
+    const botMix = mix(valuebl as never, valuebr as never, s as never);
+    return mix(botMix as never, topMix as never, t as never);
+  });
+
+  map.set('ramp_gradient', (node, context, scopeGraph) => {
+    const x = r(node, 'x', 0, context, scopeGraph);
+    const interval1 = r(node, 'interval1', 0, context, scopeGraph);
+    const interval2 = r(node, 'interval2', 1, context, scopeGraph);
+    const color1 = r(node, 'color1', vec4(0, 0, 0, 1), context, scopeGraph);
+    const color2 = r(node, 'color2', vec4(1, 1, 1, 1), context, scopeGraph);
+    const interpolation = r(node, 'interpolation', 1, context, scopeGraph);
+    const prevColor = r(node, 'prev_color', vec4(0, 0, 0, 1), context, scopeGraph);
+    const intervalNum = r(node, 'interval_num', 1, context, scopeGraph);
+    const numIntervals = r(node, 'num_intervals', 2, context, scopeGraph);
+    const mixColor4 = (bg: unknown, fg: unknown, factor: unknown): unknown =>
+      vec4(
+        mix(getNodeChannel(bg, 0) as never, getNodeChannel(fg, 0) as never, factor as never),
+        mix(getNodeChannel(bg, 1) as never, getNodeChannel(fg, 1) as never, factor as never),
+        mix(getNodeChannel(bg, 2) as never, getNodeChannel(fg, 2) as never, factor as never),
+        mix(getNodeChannel(bg, 3) as never, getNodeChannel(fg, 3) as never, factor as never)
+      );
+
+    const linearClamped = clamp(x as never, interval1 as never, interval2 as never);
+    const rangeSize = sub(interval2 as never, interval1 as never);
+    const safeRange = max(rangeSize as never, float(1e-6));
+    const linearRemap = div(sub(linearClamped as never, interval1 as never), safeRange as never);
+    const smoothVal = smoothstep(interval1 as never, interval2 as never, x as never);
+    const interpolationDistanceToLinear = abs(sub(interpolation as never, float(0)) as never);
+    const useLinear = sub(float(1), step(float(0.5), interpolationDistanceToLinear as never));
+    const interpFactor = mix(smoothVal as never, linearRemap as never, useLinear as never);
+
+    const mixedColor = mixColor4(color1, color2, interpFactor);
+    const stepColor = mixColor4(color1, color2, step(interval2 as never, x as never));
+    const interpolationDistanceToStep = abs(sub(interpolation as never, float(2)) as never);
+    const useStep = sub(float(1), step(float(0.5), interpolationDistanceToStep as never));
+    const interpolated = mixColor4(mixedColor, stepColor, useStep);
+    const withinInterval = mixColor4(prevColor, interpolated, step(add(interval1 as never, float(1e-6)) as never, x as never));
+    return mixColor4(withinInterval, prevColor, step(numIntervals as never, intervalNum as never));
+  });
+
+  map.set('ramp', (node, context, scopeGraph) => {
+    const texcoord = r(node, 'texcoord', uv(0), context, scopeGraph);
+    const rampType = r(node, 'type', 0, context, scopeGraph);
+    const interpolation = r(node, 'interpolation', 1, context, scopeGraph);
+    const numIntervals = r(node, 'num_intervals', 2, context, scopeGraph);
+    const mixColor4 = (bg: unknown, fg: unknown, factor: unknown): unknown =>
+      vec4(
+        mix(getNodeChannel(bg, 0) as never, getNodeChannel(fg, 0) as never, factor as never),
+        mix(getNodeChannel(bg, 1) as never, getNodeChannel(fg, 1) as never, factor as never),
+        mix(getNodeChannel(bg, 2) as never, getNodeChannel(fg, 2) as never, factor as never),
+        mix(getNodeChannel(bg, 3) as never, getNodeChannel(fg, 3) as never, factor as never)
+      );
+
+    const clamped = clamp(texcoord as never, vec2(0, 0) as never, vec2(1, 1) as never);
+    const s = getNodeChannel(clamped, 0);
+    const t = getNodeChannel(clamped, 1);
+
+    const centered_s = sub(s as never, float(0.5));
+    const centered_t = sub(t as never, float(0.5));
+
+    // standard = s, radial = distance from center, circular = angle/2pi, box = max(|s-0.5|, |t-0.5|)*2
+    const radialDist = sqrt(add(mul(centered_s as never, centered_s as never) as never, mul(centered_t as never, centered_t as never) as never) as never);
+    const radialVal = clamp(mul(radialDist as never, float(2)) as never, float(0), float(1));
+
+    const circularAngle = add(
+      div(atan2(centered_t as never, centered_s as never) as never, float(Math.PI * 2)) as never,
+      float(0.5)
+    );
+
+    const boxVal = clamp(
+      mul(max(abs(centered_s as never) as never, abs(centered_t as never) as never) as never, float(2)) as never,
+      float(0), float(1)
+    );
+
+    const typeDistanceToRadial = abs(sub(rampType as never, float(1)) as never);
+    const typeDistanceToCircular = abs(sub(rampType as never, float(2)) as never);
+    const typeDistanceToBox = abs(sub(rampType as never, float(3)) as never);
+    const useRadial = sub(float(1), step(float(0.5), typeDistanceToRadial as never));
+    const useCircular = sub(float(1), step(float(0.5), typeDistanceToCircular as never));
+    const useBox = sub(float(1), step(float(0.5), typeDistanceToBox as never));
+    const afterRadial = mix(s as never, radialVal as never, useRadial as never);
+    const afterCircular = mix(afterRadial as never, circularAngle as never, useCircular as never);
+    const rampX = mix(afterCircular as never, boxVal as never, useBox as never);
+
+    const intervals: unknown[] = [];
+    const colors: unknown[] = [];
+    for (let i = 1; i <= 10; i += 1) {
+      intervals.push(r(node, `interval${i}`, i <= 2 ? (i - 1) : 1, context, scopeGraph));
+      colors.push(r(node, `color${i}`, vec4(i === 1 ? 0 : 1, i === 1 ? 0 : 1, i === 1 ? 0 : 1, 1), context, scopeGraph));
+    }
+
+    let result: unknown = colors[0]!;
+    for (let i = 0; i < 9; i += 1) {
+      const iv1 = intervals[i]!;
+      const iv2 = intervals[i + 1]!;
+      const c1 = colors[i]!;
+      const c2 = colors[i + 1]!;
+      const intNum = float(i + 1);
+
+      const rangeSize = sub(iv2 as never, iv1 as never);
+      const safeRange = max(rangeSize as never, float(1e-6));
+      const linearClamped = clamp(rampX as never, iv1 as never, iv2 as never);
+      const linearRemap = div(sub(linearClamped as never, iv1 as never), safeRange as never);
+      const smoothVal = smoothstep(iv1 as never, iv2 as never, rampX as never);
+
+      const interpolationDistanceToLinear = abs(sub(interpolation as never, float(0)) as never);
+      const useLinear = sub(float(1), step(float(0.5), interpolationDistanceToLinear as never));
+      const interpFactor = mix(smoothVal as never, linearRemap as never, useLinear as never);
+      const mixedColor = mixColor4(c1, c2, interpFactor);
+      const stepColor = mixColor4(c1, c2, step(iv2 as never, rampX as never));
+      const interpolationDistanceToStep = abs(sub(interpolation as never, float(2)) as never);
+      const useStep = sub(float(1), step(float(0.5), interpolationDistanceToStep as never));
+      const interpolated = mixColor4(mixedColor, stepColor, useStep);
+      const withinInterval = mixColor4(result, interpolated, step(add(iv1 as never, float(1e-6)) as never, rampX as never));
+      result = mixColor4(withinInterval, result, step(numIntervals as never, intNum as never));
+    }
+
+    return result;
   });
 
   return map;

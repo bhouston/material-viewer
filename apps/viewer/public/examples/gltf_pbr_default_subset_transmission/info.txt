@@ -1,0 +1,1 @@
+glTF PBR subset 3: active transmission/thickness/attenuation
