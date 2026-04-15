@@ -33,6 +33,8 @@ const openPbrSoapBubbleFixture = path.resolve(
   sourceDir,
   '../../../../MaterialX/resources/Materials/Examples/OpenPbr/open_pbr_soapbubble.mtlx'
 );
+const gltfPbrDefaultFixture = path.resolve(sourceDir, '../../../../MaterialX/resources/Materials/Examples/GltfPbr/gltf_pbr_default.mtlx');
+const gltfPbrBoomBoxFixture = path.resolve(sourceDir, '../../../../MaterialX/resources/Materials/Examples/GltfPbr/gltf_pbr_boombox.mtlx');
 
 const compileFixture = (fixturePath: string) => {
   const xml = readFileSync(fixturePath, 'utf8');
@@ -214,6 +216,35 @@ describe('materialx-three compiler', () => {
     expect(compiled.material.iridescenceNode).toBeDefined();
     expect(compiled.material.iridescenceIORNode).toBeDefined();
     expect(compiled.material.iridescenceThicknessNode).toBeDefined();
+  });
+
+  it('compiles a gltf_pbr material into node assignments', () => {
+    const result = compileFixture(gltfPbrDefaultFixture);
+    expect(result.surfaceShaderName).toBe('SR_default');
+    expect(result.assignments.colorNode).toBeDefined();
+    expect(result.assignments.roughnessNode).toBeDefined();
+    expect(result.assignments.metalnessNode).toBeDefined();
+    expect(result.assignments.opacityNode).toBeDefined();
+    expect(result.assignments.transmissionNode).toBeDefined();
+    expect(result.assignments.iorNode).toBeDefined();
+    expectCategoriesSupported(result, ['gltf_pbr']);
+  });
+
+  it('supports broad gltf_* texture node coverage used by boombox fixture', () => {
+    const result = compileFixture(gltfPbrBoomBoxFixture);
+    expectCategoriesSupported(result, [
+      'gltf_pbr',
+      'gltf_colorimage',
+      'gltf_image',
+      'gltf_normalmap',
+      'separate3',
+    ]);
+    expect(result.assignments.colorNode).toBeDefined();
+    expect(result.assignments.metalnessNode).toBeDefined();
+    expect(result.assignments.roughnessNode).toBeDefined();
+    expect(result.assignments.normalNode).toBeDefined();
+    expect(result.assignments.emissiveNode).toBeDefined();
+    expect(result.assignments.opacityNode).toBeDefined();
   });
 
   it('supports place2d texture transforms in greysphere calibration fixture', () => {

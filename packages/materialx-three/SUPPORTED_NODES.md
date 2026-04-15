@@ -5,8 +5,8 @@ Generated from `@materialx-js/materialx` node registry.
 ## Summary
 
 - Total categories in registry: 223
-- Supported categories: 88
-- Unsupported categories: 135
+- Supported categories: 94
+- Unsupported categories: 129
 
 ## Supported
 
@@ -38,6 +38,12 @@ Generated from `@materialx-js/materialx` node registry.
 - `fract`
 - `fractal3d`
 - `frame`
+- `gltf_anisotropy_image`
+- `gltf_colorimage`
+- `gltf_image`
+- `gltf_iridescence_thickness`
+- `gltf_normalmap`
+- `gltf_pbr`
 - `heighttonormal`
 - `hextiledimage`
 - `hextilednormalmap`
@@ -162,12 +168,6 @@ Generated from `@materialx-js/materialx` node registry.
 - `geompropvalue`
 - `geompropvalueuniform`
 - `glossiness_anisotropy`
-- `gltf_anisotropy_image`
-- `gltf_colorimage`
-- `gltf_image`
-- `gltf_iridescence_thickness`
-- `gltf_normalmap`
-- `gltf_pbr`
 - `gooch_shade`
 - `grid`
 - `hexagon`

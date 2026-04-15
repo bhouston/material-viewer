@@ -72,6 +72,7 @@ import {
   vec4,
 } from 'three/tsl';
 import { buildGraphIndex, resolveInputReference } from './graph/resolve.js';
+import { buildGltfPbrSurfaceAssignments } from './mapping/gltf-pbr.js';
 import { supportedNodeCategories } from './mapping/mx-node-map.js';
 import { buildOpenPbrSurfaceAssignments } from './mapping/open-pbr-surface.js';
 import { buildStandardSurfaceAssignments } from './mapping/standard-surface.js';
@@ -258,6 +259,63 @@ const compileTextureNode = (node: MaterialXNode, context: CompileContext, scopeG
   return selectTextureSample(colorCorrected, node.type);
 };
 
+const compileGltfTextureSample = (node: MaterialXNode, context: CompileContext, scopeGraph?: MaterialXNodeGraph): unknown => {
+  const fileInput = readInput(node, 'file');
+  const uri = fileInput?.value ?? fileInput?.attributes.value;
+  if (!uri) {
+    warn(context, {
+      code: 'invalid-value',
+      message: `Texture node "${node.name ?? node.category}" is missing a file input`,
+      category: node.category,
+      nodeName: node.name,
+    });
+    return vec4(0, 0, 0, 1);
+  }
+
+  const texcoord = resolveInputNode(node, 'texcoord', uv(0), context, scopeGraph);
+  const pivot = resolveInputNode(node, 'pivot', vec2(0, 0), context, scopeGraph);
+  const scaleNode = resolveInputNode(node, 'scale', vec2(1, 1), context, scopeGraph);
+  const rotate = resolveInputNode(node, 'rotate', 0, context, scopeGraph);
+  const offset = resolveInputNode(node, 'offset', vec2(0, 0), context, scopeGraph);
+  const operationOrderInput = readInput(node, 'operationorder');
+  const operationOrder = toScalar(operationOrderInput?.value ?? operationOrderInput?.attributes.value);
+  if (operationOrder !== undefined && Math.abs(operationOrder) > Number.EPSILON) {
+    warn(context, {
+      code: 'unsupported-node',
+      category: node.category,
+      nodeName: node.name,
+      message: `Texture transform operationorder on "${node.name ?? node.category}" is not yet honored`,
+    });
+  }
+  const transformedUv = mx_place2d(
+    texcoord as never,
+    pivot as never,
+    scaleNode as never,
+    rotate as never,
+    offset as never
+  );
+
+  const textureResolver = context.options.textureResolver ?? createTextureResolver({ basePath: context.options.basePath });
+  const tex = textureResolver.resolve(uri, { document: context.document, node });
+  return texture(tex, transformedUv as never);
+};
+
+const compileGltfImageNode = (
+  node: MaterialXNode,
+  context: CompileContext,
+  scopeGraph: MaterialXNodeGraph | undefined
+): unknown => {
+  const sampled = compileGltfTextureSample(node, context, scopeGraph);
+  const colorCorrected = applyTextureColorSpace(context.document.attributes.colorspace, sampled);
+  const sampledValue = selectTextureSample(colorCorrected, node.type);
+  const factorInput = readInput(node, 'factor');
+  const factor = factorInput ? resolveInputNode(node, 'factor', 1, context, scopeGraph) : undefined;
+  if (factor !== undefined) {
+    return mul(sampledValue as never, factor as never);
+  }
+  return sampledValue;
+};
+
 const compileHexTiledTextureNode = (node: MaterialXNode, context: CompileContext, scopeGraph?: MaterialXNodeGraph): unknown => {
   const fileInput = readInput(node, 'file');
   const uri = fileInput?.value ?? fileInput?.attributes.value;
@@ -318,6 +376,47 @@ const compileNode = (
     case 'tiledimage':
       compiled = compileTextureNode(node, context, scopeGraph);
       break;
+    case 'gltf_image':
+      compiled = compileGltfImageNode(node, context, scopeGraph);
+      break;
+    case 'gltf_colorimage': {
+      const sampled = compileGltfTextureSample(node, context, scopeGraph);
+      const colorCorrected = applyTextureColorSpace(context.document.attributes.colorspace, sampled);
+      const colorFactor = resolveInputNode(node, 'color', vec4(1, 1, 1, 1), context, scopeGraph);
+      const geomColor = resolveInputNode(node, 'geomcolor', vec4(1, 1, 1, 1), context, scopeGraph);
+      const modulated = mul(mul(colorCorrected as never, colorFactor as never) as never, geomColor as never);
+      if (outputName === 'outa') {
+        compiled = (modulated as { a?: unknown }).a ?? modulated;
+      } else {
+        compiled = (modulated as { rgb?: unknown }).rgb ?? modulated;
+      }
+      break;
+    }
+    case 'gltf_normalmap': {
+      const normalSample = compileGltfImageNode(node, context, scopeGraph);
+      compiled = normalMap(normalSample as never, float(1));
+      break;
+    }
+    case 'gltf_iridescence_thickness': {
+      const sampled = compileGltfTextureSample(node, context, scopeGraph);
+      const sampledThickness = (sampled as { x?: unknown }).x ?? sampled;
+      const thicknessMin = resolveInputNode(node, 'thicknessMin', 100, context, scopeGraph);
+      const thicknessMax = resolveInputNode(node, 'thicknessMax', 400, context, scopeGraph);
+      compiled = add(thicknessMin as never, mul(sampledThickness as never, sub(thicknessMax as never, thicknessMin as never) as never));
+      break;
+    }
+    case 'gltf_anisotropy_image': {
+      const sampled = compileGltfTextureSample(node, context, scopeGraph);
+      const anisotropyStrength = resolveInputNode(node, 'anisotropy_strength', 1, context, scopeGraph);
+      const anisotropyRotation = resolveInputNode(node, 'anisotropy_rotation', 0, context, scopeGraph);
+      if (outputName === 'anisotropy_rotation_out') {
+        compiled = anisotropyRotation;
+      } else {
+        const strengthChannel = (sampled as { z?: unknown }).z ?? sampled;
+        compiled = mul(strengthChannel as never, anisotropyStrength as never);
+      }
+      break;
+    }
     case 'texcoord': {
       const indexInput = readInput(node, 'index');
       const index = parseFloatValue(indexInput?.value ?? indexInput?.attributes.value, 0);
@@ -942,6 +1041,27 @@ const warnOpenPbrLimitations = (surfaceNode: MaterialXNode, context: CompileCont
   });
 };
 
+const warnGltfPbrLimitations = (surfaceNode: MaterialXNode, context: CompileContext): void => {
+  const unsupportedInputs = ['occlusion', 'tangent', 'dispersion', 'thickness'];
+  const activeUnsupportedInputs = unsupportedInputs.filter((name) => {
+    const input = readInput(surfaceNode, name);
+    if (!input) {
+      return false;
+    }
+    return input.value !== undefined || input.attributes.value !== undefined || input.attributes.nodename || input.attributes.nodegraph;
+  });
+
+  if (activeUnsupportedInputs.length === 0) {
+    return;
+  }
+
+  warn(context, {
+    code: 'unsupported-node',
+    nodeName: surfaceNode.name,
+    message: `glTF PBR inputs currently map to core MeshPhysical slots only; these inputs are ignored (${activeUnsupportedInputs.join(', ')})`,
+  });
+};
+
 export const compileMaterialXToTSL = (
   document: MaterialXDocument,
   options: MaterialXThreeCompileOptions = {}
@@ -972,10 +1092,10 @@ export const compileMaterialXToTSL = (
   }
 
   const surfaceShader = resolveSurfaceShaderNode(materialNode, context);
-  if (!surfaceShader || !['standard_surface', 'open_pbr_surface'].includes(surfaceShader.node.category)) {
+  if (!surfaceShader || !['standard_surface', 'open_pbr_surface', 'gltf_pbr'].includes(surfaceShader.node.category)) {
     warnings.push({
       code: 'unsupported-node',
-      message: 'Only standard_surface and open_pbr_surface are supported for surfacematerial compilation',
+      message: 'Only standard_surface, open_pbr_surface, and gltf_pbr are supported for surfacematerial compilation',
       category: surfaceShader?.node.category,
       nodeName: surfaceShader?.node.name,
     });
@@ -994,10 +1114,15 @@ export const compileMaterialXToTSL = (
   const assignments =
     surfaceShader.node.category === 'standard_surface'
       ? buildStandardSurfaceAssignments(surfaceShader.node, { getInputNode })
-      : buildOpenPbrSurfaceAssignments(surfaceShader.node, { getInputNode });
+      : surfaceShader.node.category === 'open_pbr_surface'
+        ? buildOpenPbrSurfaceAssignments(surfaceShader.node, { getInputNode })
+        : buildGltfPbrSurfaceAssignments(surfaceShader.node, { getInputNode });
 
   if (surfaceShader.node.category === 'open_pbr_surface') {
     warnOpenPbrLimitations(surfaceShader.node, context);
+  }
+  if (surfaceShader.node.category === 'gltf_pbr') {
+    warnGltfPbrLimitations(surfaceShader.node, context);
   }
 
   const coveredCategories = getCoveredCategories(document);
