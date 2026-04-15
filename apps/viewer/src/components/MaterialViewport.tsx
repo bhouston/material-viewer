@@ -6,20 +6,23 @@ import {
   BoxGeometry,
   DirectionalLight,
   EquirectangularReflectionMapping,
-  Group,
   Mesh,
   MeshStandardMaterial,
   PerspectiveCamera,
   Scene,
   SphereGeometry,
   Vector3,
-  WebGLRenderer,
 } from 'three';
+import type { Group } from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { HDRLoader } from 'three/addons/loaders/HDRLoader.js';
 import type { MeshPhysicalNodeMaterial } from 'three/webgpu';
 import type { MaterialXBackgroundPack } from '../lib/backgrounds';
+import { Button } from './ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
+import { Label } from './ui/label';
+import { Select } from './ui/select';
 
 interface MaterialViewportProps {
   nodeMaterial?: MeshPhysicalNodeMaterial;
@@ -82,7 +85,8 @@ export default function MaterialViewport({
   const defaultBackgroundMaterialRef = useRef<MeshStandardMaterial | null>(null);
   const cameraRef = useRef<PerspectiveCamera | null>(null);
   const controlsRef = useRef<OrbitControls | null>(null);
-  const [rendererLabel, setRendererLabel] = useState('WebGL fallback');
+  const [rendererLabel, setRendererLabel] = useState('WebGPU + TSL');
+  const [rendererMessage, setRendererMessage] = useState<string>();
   const [previewGeometry, setPreviewGeometry] = useState<PreviewGeometry>('totem');
   const [previewGeometryError, setPreviewGeometryError] = useState<string>();
 
@@ -119,8 +123,8 @@ export default function MaterialViewport({
         normalizePreviewModel(totemRoot, PREVIEW_TARGET_SIZE);
         const allMeshes: Mesh[] = [];
         totemRoot.traverse((entry) => {
-          if ((entry as Mesh).isMesh) {
-            allMeshes.push(entry as Mesh);
+          if ('isMesh' in entry && entry.isMesh) {
+            allMeshes.push(entry);
           }
         });
         const namedMeshes = allMeshes.filter((mesh) => mesh.name === 'Calibration_Mesh' || mesh.name === 'Preview_Mesh');
@@ -195,22 +199,31 @@ export default function MaterialViewport({
         (backgroundMaterial as unknown as { side?: number }).side = BackSide;
       }
 
-      let renderer: WebGLRenderer | { render: (scene: Scene, camera: PerspectiveCamera) => void; setSize: (w: number, h: number) => void; dispose: () => void };
-      const useWebGPU = typeof navigator !== 'undefined' && 'gpu' in navigator;
-      if (useWebGPU) {
-        try {
-          const webgpu = await import('three/webgpu');
-          const gpuRenderer = new webgpu.WebGPURenderer({ canvas, antialias: true });
-          await gpuRenderer.init();
-          renderer = gpuRenderer;
-          setRendererLabel('WebGPU + TSL');
-        } catch {
-          renderer = new WebGLRenderer({ canvas, antialias: true });
-          setRendererLabel('WebGL fallback');
-        }
-      } else {
-        renderer = new WebGLRenderer({ canvas, antialias: true });
-        setRendererLabel('WebGL fallback');
+      let renderer:
+        | {
+            render: (scene: Scene, camera: PerspectiveCamera) => void;
+            setSize: (w: number, h: number, updateStyle?: boolean) => void;
+            dispose: () => void;
+          }
+        | undefined;
+      try {
+        const webgpu = await import('three/webgpu');
+        const gpuRenderer = new webgpu.WebGPURenderer({
+          antialias: true,
+          canvas,
+        });
+        await gpuRenderer.init();
+        renderer = gpuRenderer;
+        setRendererLabel('WebGPU + TSL');
+        setRendererMessage(undefined);
+      } catch (error) {
+        setRendererLabel('Renderer unavailable');
+        setRendererMessage(
+          error instanceof Error
+            ? `WebGPU init failed: ${error.message}`
+            : 'WebGPU init failed unexpectedly.',
+        );
+        return;
       }
 
       const resize = () => {
@@ -258,7 +271,26 @@ export default function MaterialViewport({
         }
         window.cancelAnimationFrame(frameId);
         controls.dispose();
-        renderer.dispose();
+        scene.environment = null;
+        if (materialSphereRef.current && defaultMaterialRef.current) {
+          (materialSphereRef.current as unknown as { material: unknown }).material = defaultMaterialRef.current;
+        }
+        if (materialCubeRef.current && defaultMaterialRef.current) {
+          (materialCubeRef.current as unknown as { material: unknown }).material = defaultMaterialRef.current;
+        }
+        for (const mesh of materialTotemMeshesRef.current) {
+          if (defaultMaterialRef.current) {
+            (mesh as unknown as { material: unknown }).material = defaultMaterialRef.current;
+          }
+        }
+        if (backgroundSphereRef.current && defaultBackgroundMaterialRef.current) {
+          (backgroundSphereRef.current as unknown as { material: unknown }).material = defaultBackgroundMaterialRef.current;
+        }
+        try {
+          renderer.dispose();
+        } catch (error) {
+          console.warn('Failed to dispose renderer cleanly', error);
+        }
         environmentTexture?.dispose();
         sphere.geometry.dispose();
         cube.geometry.dispose();
@@ -268,8 +300,8 @@ export default function MaterialViewport({
         materialSphereRef.current = null;
         materialCubeRef.current = null;
         materialTotemRootRef.current?.traverse((entry) => {
-          if ((entry as Mesh).isMesh) {
-            (entry as Mesh).geometry.dispose();
+          if ('isMesh' in entry && entry.isMesh) {
+            entry.geometry.dispose();
           }
         });
         materialTotemRootRef.current = null;
@@ -346,56 +378,65 @@ export default function MaterialViewport({
   };
 
   return (
-    <section className="rounded-lg border border-border bg-card p-4">
-      <div className="mb-2 flex items-center justify-between text-sm">
-        <strong className="font-semibold">Preview</strong>
-        <div className="flex items-center gap-2">
-          <label className="text-muted-foreground" htmlFor="preview-geometry">
-            Model
-          </label>
-          <select
-            className="min-w-[110px] rounded-md border border-input bg-background px-2 py-1 text-xs"
-            id="preview-geometry"
-            onChange={(event) => setPreviewGeometry(event.target.value as PreviewGeometry)}
-            value={previewGeometry}
-          >
-            <option value="totem">Totem</option>
-            <option value="sphere">Sphere</option>
-            <option value="cube">Cube</option>
-          </select>
-          <label className="text-muted-foreground" htmlFor="background">
-            Background
-          </label>
-          <select
-            className="min-w-[140px] rounded-md border border-input bg-background px-2 py-1 text-xs"
-            id="background"
-            onChange={(event) => onBackgroundChange(event.target.value)}
-            value={selectedBackground}
-          >
-            {backgroundPacks.map((background) => (
-              <option key={background.id} value={background.id}>
-                {background.directory}
-              </option>
-            ))}
-          </select>
-          <button
-            className="rounded-md border border-input bg-background px-2 py-1 text-xs hover:bg-muted"
-            onClick={handleResetView}
-            type="button"
-          >
-            Reset view
-          </button>
-          <span className="text-muted-foreground">{rendererLabel}</span>
+    <Card className="panel-surface">
+      <CardHeader className="space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <CardTitle className="text-base">Preview</CardTitle>
+          <span className="rounded-md border border-border/80 bg-muted/60 px-2 py-1 text-xs text-muted-foreground">
+            {rendererLabel}
+          </span>
         </div>
-      </div>
-      {backgroundError ? <p className="mb-2 mt-0 text-xs text-destructive">{backgroundError}</p> : null}
-      {previewGeometryError ? <p className="mb-2 mt-0 text-xs text-destructive">{previewGeometryError}</p> : null}
-      <div
-        ref={viewportRef}
-        className="h-[360px] w-full overflow-hidden rounded-md border border-border bg-background"
-      >
-        <canvas ref={canvasRef} className="block h-full w-full" />
-      </div>
-    </section>
+        <div className="grid gap-3 md:grid-cols-[minmax(0,140px)_minmax(0,220px)_auto] md:items-end">
+          <div className="space-y-1.5">
+            <Label className="text-xs uppercase tracking-[0.12em] text-muted-foreground" htmlFor="preview-geometry">
+              Model
+            </Label>
+            <Select
+              className="text-xs"
+              id="preview-geometry"
+              onChange={(event) => setPreviewGeometry(event.target.value as PreviewGeometry)}
+              value={previewGeometry}
+            >
+              <option value="totem">Totem</option>
+              <option value="sphere">Sphere</option>
+              <option value="cube">Cube</option>
+            </Select>
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs uppercase tracking-[0.12em] text-muted-foreground" htmlFor="background">
+              Background
+            </Label>
+            <Select
+              className="text-xs"
+              id="background"
+              onChange={(event) => onBackgroundChange(event.target.value)}
+              value={selectedBackground}
+            >
+              {backgroundPacks.map((background) => (
+                <option key={background.id} value={background.id}>
+                  {background.directory}
+                </option>
+              ))}
+            </Select>
+          </div>
+          <div className="md:justify-self-end">
+            <Button className="w-full md:w-auto" onClick={handleResetView} size="sm" type="button" variant="outline">
+              Reset view
+            </Button>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-2">
+        {backgroundError ? <p className="m-0 text-xs text-destructive">{backgroundError}</p> : null}
+        {previewGeometryError ? <p className="m-0 text-xs text-destructive">{previewGeometryError}</p> : null}
+        {rendererMessage ? <p className="m-0 text-xs text-muted-foreground">{rendererMessage}</p> : null}
+        <div
+          ref={viewportRef}
+          className="h-[420px] w-full overflow-hidden rounded-lg border border-border/90 bg-background shadow-inner"
+        >
+          <canvas ref={canvasRef} className="block h-full w-full" />
+        </div>
+      </CardContent>
+    </Card>
   );
 }

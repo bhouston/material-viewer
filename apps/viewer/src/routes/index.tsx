@@ -1,9 +1,15 @@
 import { parseMaterialX } from '@materialx-js/materialx/dist/xml.js'
 import { createThreeMaterialFromDocument } from '@materialx-js/materialx-three'
-import { createFileRoute } from '@tanstack/react-router'
+import { ClientOnly, createFileRoute, useHydrated } from '@tanstack/react-router'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { MeshPhysicalNodeMaterial } from 'three/webgpu'
 import MaterialViewport from '../components/MaterialViewport'
+import { Badge } from '../components/ui/badge'
+import { Button } from '../components/ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
+import { Label } from '../components/ui/label'
+import { Select } from '../components/ui/select'
+import { Separator } from '../components/ui/separator'
+import { Textarea } from '../components/ui/textarea'
 import { loadMaterialXBackgroundPack, materialXBackgroundPacks } from '../lib/backgrounds'
 import { createBrowserTextureResolver } from '../lib/browser-texture-resolver'
 import { importMaterialXBundle } from '../lib/materialx-import'
@@ -21,6 +27,7 @@ export const Route = createFileRoute('/')({
 
 function App() {
   const { samplePacks, initialSample } = Route.useLoaderData()
+  const hydrated = useHydrated()
   const [selectedSample, setSelectedSample] = useState(samplePacks[0]?.id ?? '')
   const [xml, setXml] = useState(initialSample?.xml ?? '')
   const [sampleLabel, setSampleLabel] = useState(samplePacks[0]?.label ?? 'Custom')
@@ -44,6 +51,13 @@ function App() {
   }, [])
 
   const compileState = useMemo(() => {
+    if (!hydrated) {
+      return {
+        error: 'Preparing client-side compiler...',
+        result: undefined,
+        material: undefined,
+      }
+    }
     try {
       if (!xml.trim()) {
         return {
@@ -59,7 +73,7 @@ function App() {
       return {
         error: undefined,
         result,
-        material: material as MeshPhysicalNodeMaterial,
+        material,
       }
     } catch (error) {
       return {
@@ -68,9 +82,15 @@ function App() {
         material: undefined,
       }
     }
-  }, [assetUrls, xml])
+  }, [assetUrls, hydrated, xml])
 
   const backgroundCompileState = useMemo(() => {
+    if (!hydrated) {
+      return {
+        error: undefined,
+        material: undefined,
+      }
+    }
     try {
       if (!backgroundXml.trim()) {
         return {
@@ -82,7 +102,7 @@ function App() {
       const { material } = createThreeMaterialFromDocument(document)
       return {
         error: undefined,
-        material: material as MeshPhysicalNodeMaterial,
+        material,
       }
     } catch (error) {
       return {
@@ -90,7 +110,7 @@ function App() {
         material: undefined,
       }
     }
-  }, [backgroundXml])
+  }, [backgroundXml, hydrated])
 
   const handleSampleChange = useCallback(async (sampleId: string) => {
     setSelectedSample(sampleId)
@@ -136,9 +156,6 @@ function App() {
 
   useEffect(() => {
     const initial = materialXBackgroundPacks[0]
-    if (!initial) {
-      return
-    }
     void handleBackgroundChange(initial.id)
   }, [handleBackgroundChange])
 
@@ -190,137 +207,180 @@ function App() {
   )
 
   return (
-    <main className="page-wrap px-4 py-6">
-      <section className="space-y-4">
-        <section className="rounded-lg border border-border bg-card p-4">
-          <h1 className="mb-1 text-2xl font-semibold">MaterialX Viewer</h1>
-          <p className="m-0 text-sm text-muted-foreground">
-            Load a MaterialX document, compile it with <code>@materialx-js/materialx-three</code>, and inspect support
-            diagnostics.
-          </p>
-        </section>
-
-        <section className="rounded-lg border border-border bg-card p-4">
-          <div className="mb-3 flex flex-wrap items-center gap-2">
-            <label className="text-sm font-medium" htmlFor="sample">
-              Built-in sample
-            </label>
-            <select
-              className="min-w-[280px] rounded-md border border-input bg-background px-3 py-1.5 text-sm"
-              id="sample"
-              onChange={(event) => {
-                void handleSampleChange(event.target.value)
-              }}
-              value={selectedSample}
-            >
-              {samplePacks.map((sample) => (
-                <option key={sample.id} value={sample.id}>
-                  {sample.label}
-                </option>
-              ))}
-            </select>
+    <div className="page-wrap space-y-6">
+      <Card className="panel-surface">
+        <CardHeader className="space-y-3">
+          <Badge className="w-fit" variant="secondary">
+            MaterialX Tooling
+          </Badge>
+          <div className="space-y-1">
+            <CardTitle className="text-2xl md:text-3xl">MaterialX Viewer</CardTitle>
+            <CardDescription className="max-w-3xl text-sm leading-6">
+              Load a MaterialX document, compile it with <code>@materialx-js/materialx-three</code>, and inspect
+              diagnostics while previewing materials in real time.
+            </CardDescription>
           </div>
-          <button
-            className={`w-full rounded-md border-2 border-dashed px-4 py-3 text-left text-sm transition-colors ${
-              isDragging ? 'border-primary bg-primary/10' : 'border-border bg-background hover:bg-muted/50'
-            }`}
-            onClick={() => fileInputRef.current?.click()}
-            onDragLeave={() => setIsDragging(false)}
-            onDragOver={(event) => {
-              event.preventDefault()
-              setIsDragging(true)
-            }}
-            onDrop={handleDrop}
-            type="button"
+        </CardHeader>
+      </Card>
+
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+        <div className="space-y-6">
+          <Card className="panel-surface">
+            <CardHeader>
+              <CardTitle className="text-base">Source Selection</CardTitle>
+              <CardDescription>Start from a built-in sample or import your own MaterialX bundle.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="sample">Built-in sample</Label>
+                <Select
+                  className="min-w-[280px]"
+                  id="sample"
+                  onChange={(event) => {
+                    void handleSampleChange(event.target.value)
+                  }}
+                  value={selectedSample}
+                >
+                  {samplePacks.map((sample) => (
+                    <option key={sample.id} value={sample.id}>
+                      {sample.label}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+              <Button
+                className={`h-auto w-full justify-start border-2 border-dashed px-4 py-4 text-left ${
+                  isDragging ? 'border-primary bg-primary/10' : 'border-border bg-background hover:bg-muted/50'
+                }`}
+                onClick={() => fileInputRef.current?.click()}
+                onDragLeave={() => setIsDragging(false)}
+                onDragOver={(event) => {
+                  event.preventDefault()
+                  setIsDragging(true)
+                }}
+                onDrop={handleDrop}
+                type="button"
+                variant="outline"
+              >
+                <input
+                  accept=".mtlx,.png,.jpg,.jpeg,.webp,.gif,.exr,.hdr"
+                  className="hidden"
+                  multiple
+                  onChange={handleFileInput}
+                  ref={fileInputRef}
+                  type="file"
+                />
+                <div className="space-y-1">
+                  <p className="m-0 text-sm font-semibold">Drag and drop files</p>
+                  <p className="m-0 text-xs font-normal text-muted-foreground">{dropMessage}</p>
+                </div>
+              </Button>
+              <div className="panel-muted px-3 py-2 text-xs text-muted-foreground">
+                Active source: <code>{sampleLabel}</code>
+              </div>
+            </CardContent>
+          </Card>
+
+          <ClientOnly
+            fallback={
+              <Card className="panel-surface">
+                <CardHeader>
+                  <CardTitle className="text-base">Preview</CardTitle>
+                  <CardDescription>Initializing 3D viewport...</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="h-[420px] w-full rounded-lg border border-border/90 bg-muted/40" />
+                </CardContent>
+              </Card>
+            }
           >
-            <input
-              accept=".mtlx,.png,.jpg,.jpeg,.webp,.gif,.exr,.hdr"
-              className="hidden"
-              multiple
-              onChange={handleFileInput}
-              ref={fileInputRef}
-              type="file"
+            <MaterialViewport
+              backgroundError={backgroundError ?? backgroundCompileState.error}
+              backgroundMaterial={backgroundCompileState.material}
+              backgroundPacks={materialXBackgroundPacks}
+              nodeMaterial={compileState.material}
+              onBackgroundChange={(backgroundId) => {
+                void handleBackgroundChange(backgroundId)
+              }}
+              selectedBackground={selectedBackground}
             />
-            <p className="m-0 font-medium">Drag and drop files</p>
-            <p className="m-0 mt-1 text-muted-foreground">{dropMessage}</p>
-          </button>
-          <p className="mb-0 mt-3 text-xs text-muted-foreground">
-            Active source: <code>{sampleLabel}</code>
-          </p>
-        </section>
+          </ClientOnly>
 
-        <MaterialViewport
-          backgroundError={backgroundError ?? backgroundCompileState.error}
-          backgroundMaterial={backgroundCompileState.material}
-          backgroundPacks={materialXBackgroundPacks}
-          nodeMaterial={compileState.material}
-          onBackgroundChange={(backgroundId) => {
-            void handleBackgroundChange(backgroundId)
-          }}
-          selectedBackground={selectedBackground}
-        />
+          <Card className="panel-surface">
+            <CardHeader>
+              <CardTitle className="text-base">MaterialX Source</CardTitle>
+              <CardDescription>Directly edit the active MaterialX document and recompile instantly.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Textarea
+                className="min-h-[460px] text-xs leading-5"
+                onChange={(event) => setXml(event.target.value)}
+                rows={20}
+                spellCheck={false}
+                value={xml}
+              />
+            </CardContent>
+          </Card>
+        </div>
 
-        <section className="rounded-lg border border-border bg-card p-4 text-sm">
-          <h2 className="mb-3 text-base font-semibold">Compilation Diagnostics</h2>
-          {compileState.error ? (
-            <p className="m-0 text-destructive">{compileState.error}</p>
-          ) : (
-            <div className="space-y-3">
-              <p className="m-0">
-                Material: <code>{compileState.result?.materialName ?? 'n/a'}</code>
-              </p>
-              <p className="m-0">
-                Surface shader: <code>{compileState.result?.surfaceShaderName ?? 'n/a'}</code>
-              </p>
-              <p className="m-0">Supported in document: {compileState.result?.supportedCategories.length ?? 0}</p>
-              <p className="m-0">Unsupported in document: {compileState.result?.unsupportedCategories.length ?? 0}</p>
-              <p className="m-0">Related assets available: {loadedAssets.length}</p>
-              <details>
-                <summary className="cursor-pointer font-medium">Warnings ({compileState.result?.warnings.length ?? 0})</summary>
-                <ul className="m-0 mt-2 space-y-1 pl-5">
-                  {(compileState.result?.warnings ?? []).map((warning) => (
-                    <li key={`${warning.code}-${warning.nodeName ?? warning.message}`}>{warning.message}</li>
-                  ))}
-                  {(compileState.result?.warnings.length ?? 0) === 0 ? <li>No warnings.</li> : null}
-                </ul>
-              </details>
-              <details>
-                <summary className="cursor-pointer font-medium">Unsupported categories</summary>
-                <ul className="m-0 mt-2 max-h-44 overflow-auto pl-5">
-                  {(compileState.result?.unsupportedCategories ?? []).map((entry) => (
-                    <li key={entry}>
-                      <code>{entry}</code>
-                    </li>
-                  ))}
-                  {(compileState.result?.unsupportedCategories.length ?? 0) === 0 ? <li>None</li> : null}
-                </ul>
-              </details>
-              <details>
-                <summary className="cursor-pointer font-medium">Loaded related files</summary>
-                <ul className="m-0 mt-2 max-h-44 overflow-auto pl-5">
-                  {loadedAssets.map((entry) => (
-                    <li key={entry}>
-                      <code>{entry}</code>
-                    </li>
-                  ))}
-                  {loadedAssets.length === 0 ? <li>None</li> : null}
-                </ul>
-              </details>
-            </div>
-          )}
-        </section>
-
-        <section className="rounded-lg border border-border bg-card p-4">
-          <h2 className="mb-2 text-base font-semibold">MaterialX Source</h2>
-          <textarea
-            className="w-full rounded-md border border-input bg-background p-3 font-mono text-xs"
-            onChange={(event) => setXml(event.target.value)}
-            rows={20}
-            spellCheck={false}
-            value={xml}
-          />
-        </section>
-      </section>
-    </main>
+        <Card className="panel-surface h-fit">
+          <CardHeader>
+            <CardTitle className="text-base">Compilation Diagnostics</CardTitle>
+            <CardDescription>Inspect compiler output, warnings, unsupported categories, and imported assets.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4 text-sm">
+            {compileState.error ? (
+              <p className="m-0 text-destructive">{compileState.error}</p>
+            ) : (
+              <>
+                <div className="space-y-2">
+                  <p className="m-0">
+                    Material: <code>{compileState.result?.materialName ?? 'n/a'}</code>
+                  </p>
+                  <p className="m-0">
+                    Surface shader: <code>{compileState.result?.surfaceShaderName ?? 'n/a'}</code>
+                  </p>
+                  <p className="m-0">Supported in document: {compileState.result?.supportedCategories.length ?? 0}</p>
+                  <p className="m-0">Unsupported in document: {compileState.result?.unsupportedCategories.length ?? 0}</p>
+                  <p className="m-0">Related assets available: {loadedAssets.length}</p>
+                </div>
+                <Separator />
+                <details>
+                  <summary className="cursor-pointer font-medium">Warnings ({compileState.result?.warnings.length ?? 0})</summary>
+                  <ul className="m-0 mt-2 space-y-1 pl-5">
+                    {(compileState.result?.warnings ?? []).map((warning) => (
+                      <li key={`${warning.code}-${warning.nodeName ?? warning.message}`}>{warning.message}</li>
+                    ))}
+                    {(compileState.result?.warnings.length ?? 0) === 0 ? <li>No warnings.</li> : null}
+                  </ul>
+                </details>
+                <details>
+                  <summary className="cursor-pointer font-medium">Unsupported categories</summary>
+                  <ul className="m-0 mt-2 max-h-44 overflow-auto pl-5">
+                    {(compileState.result?.unsupportedCategories ?? []).map((entry) => (
+                      <li key={entry}>
+                        <code>{entry}</code>
+                      </li>
+                    ))}
+                    {(compileState.result?.unsupportedCategories.length ?? 0) === 0 ? <li>None</li> : null}
+                  </ul>
+                </details>
+                <details>
+                  <summary className="cursor-pointer font-medium">Loaded related files</summary>
+                  <ul className="m-0 mt-2 max-h-44 overflow-auto pl-5">
+                    {loadedAssets.map((entry) => (
+                      <li key={entry}>
+                        <code>{entry}</code>
+                      </li>
+                    ))}
+                    {loadedAssets.length === 0 ? <li>None</li> : null}
+                  </ul>
+                </details>
+              </>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    </div>
   )
 }

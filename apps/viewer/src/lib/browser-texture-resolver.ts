@@ -1,5 +1,6 @@
 import type { TextureResolver } from '@materialx-js/materialx-three';
-import { RepeatWrapping, Texture, TextureLoader } from 'three';
+import { RepeatWrapping, TextureLoader } from 'three';
+import type { Texture } from 'three';
 
 const normalizePath = (value: string): string => {
   const raw = value.replaceAll('\\', '/');
@@ -23,12 +24,14 @@ const basename = (value: string): string => {
   return parts[parts.length - 1] ?? normalized;
 };
 
-const findAssetUrl = (uri: string, assets: Record<string, string>, filePrefix?: string): string | undefined => {
+type AssetLookup = Record<string, string | undefined>;
+
+const findAssetUrl = (uri: string, assets: AssetLookup, filePrefix?: string): string | undefined => {
   const resolved = normalizePath(`${filePrefix ?? ''}/${uri}`);
   return assets[resolved] ?? assets[uri] ?? assets[basename(resolved)] ?? assets[basename(uri)];
 };
 
-export const createBrowserTextureResolver = (assets: Record<string, string>): TextureResolver => {
+export const createBrowserTextureResolver = (assets: AssetLookup): TextureResolver => {
   const cache = new Map<string, Texture>();
   const loader = new TextureLoader();
 

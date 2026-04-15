@@ -1,45 +1,46 @@
 import { Link } from '@tanstack/react-router'
 import { Box, Github } from 'lucide-react'
-import ThemeToggle from './ThemeToggle'
+import { Button } from './ui/button'
 
 export default function Header() {
   return (
-    <header className="border-b border-border bg-card px-4">
+    <header className="sticky top-0 z-40 border-b border-border/90 bg-background/95 px-4 backdrop-blur-sm">
       <nav className="page-wrap flex h-14 items-center gap-4">
-        <Link
-          className="inline-flex items-center gap-2 text-foreground no-underline"
-          search={{}}
-          to="/"
-        >
-          <Box className="size-5" />
-          <span className="text-base font-semibold">Viewer</span>
+        <Link className="inline-flex items-center gap-2 text-foreground no-underline" search={{}} to="/">
+          <span className="grid size-8 place-items-center rounded-md border border-border bg-card shadow-[var(--shadow-soft)]">
+            <Box className="size-4" />
+          </span>
+          <span className="leading-tight">
+            <span className="block text-xs tracking-[0.14em] text-muted-foreground uppercase">materialx.js</span>
+            <span className="block text-sm font-semibold">Viewer</span>
+          </span>
         </Link>
 
-        <div className="ml-auto flex items-center gap-4">
-          <Link
-            activeProps={{ className: 'text-foreground' }}
-            className="text-sm text-muted-foreground no-underline transition-colors hover:text-foreground"
-            to="/"
-          >
-            Home
-          </Link>
-          <Link
-            activeProps={{ className: 'text-foreground' }}
-            className="text-sm text-muted-foreground no-underline transition-colors hover:text-foreground"
-            to="/about"
-          >
-            About
-          </Link>
-          <a
-            aria-label="GitHub repository"
-            className="text-muted-foreground transition-colors hover:text-foreground"
-            href="https://github.com/materialx"
-            rel="noopener noreferrer"
-            target="_blank"
-          >
-            <Github className="size-5" />
-          </a>
-          <ThemeToggle />
+        <div className="ml-auto flex items-center gap-1">
+          <Button asChild size="sm" variant="ghost">
+            <Link activeProps={{ className: 'text-foreground' }} className="text-muted-foreground no-underline" to="/">
+              Home
+            </Link>
+          </Button>
+          <Button asChild size="sm" variant="ghost">
+            <Link
+              activeProps={{ className: 'text-foreground' }}
+              className="text-muted-foreground no-underline"
+              to="/about"
+            >
+              About
+            </Link>
+          </Button>
+          <Button asChild size="icon" variant="outline">
+            <a
+              aria-label="GitHub repository"
+              href="https://github.com/materialx"
+              rel="noopener noreferrer"
+              target="_blank"
+            >
+              <Github className="size-4" />
+            </a>
+          </Button>
         </div>
       </nav>
     </header>

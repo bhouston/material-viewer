@@ -6,7 +6,7 @@
     "#/*": "./src/*"
   },
   "scripts": {
-    "dev": "vite dev --port 3000",
+    "dev": "vite dev --port 4000",
     "build": "vite build",
     "preview": "vite preview",
     "test": "vitest run",
@@ -17,6 +17,7 @@
   "dependencies": {
     "@materialx-js/materialx": "workspace:*",
     "@materialx-js/materialx-three": "workspace:*",
+    "@radix-ui/react-slot": "^1.2.4",
     "@tailwindcss/vite": "^4.1.18",
     "@tanstack/react-devtools": "latest",
     "@tanstack/react-router": "latest",
@@ -24,9 +25,12 @@
     "@tanstack/react-router-ssr-query": "latest",
     "@tanstack/react-start": "latest",
     "@tanstack/router-plugin": "^1.132.0",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
     "lucide-react": "^0.545.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
+    "tailwind-merge": "^3.5.0",
     "tailwindcss": "^4.1.18",
     "three": "^0.181.0"
   },

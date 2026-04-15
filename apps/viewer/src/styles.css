@@ -1,63 +1,34 @@
 @import "tailwindcss";
 
-@custom-variant dark (&:is(.dark *));
-
-body {
-  margin: 0;
-  font-family:
-    -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen", "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans",
-    "Helvetica Neue", sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
-
-code {
-  font-family: source-code-pro, Menlo, Monaco, Consolas, "Courier New", monospace;
-}
-
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.141 0.005 285.823);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.141 0.005 285.823);
+  --background: oklch(0.984 0.003 85.6);
+  --foreground: oklch(0.216 0.014 73.1);
+  --card: oklch(0.996 0.002 84.9);
+  --card-foreground: oklch(0.216 0.014 73.1);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.141 0.005 285.823);
-  --primary: oklch(0.21 0.006 285.885);
+  --popover-foreground: oklch(0.216 0.014 73.1);
+  --primary: oklch(0.41 0.035 75.6);
   --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.967 0.001 286.375);
-  --secondary-foreground: oklch(0.21 0.006 285.885);
-  --muted: oklch(0.967 0.001 286.375);
-  --muted-foreground: oklch(0.552 0.016 285.938);
-  --accent: oklch(0.967 0.001 286.375);
-  --accent-foreground: oklch(0.21 0.006 285.885);
-  --destructive: oklch(0.577 0.245 27.325);
-  --destructive-foreground: oklch(0.577 0.245 27.325);
-  --border: oklch(0.92 0.004 286.32);
-  --input: oklch(0.92 0.004 286.32);
-  --ring: oklch(0.871 0.006 286.286);
-  --radius: 0.625rem;
-}
-
-.dark {
-  --background: oklch(0.141 0.005 285.823);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.141 0.005 285.823);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.141 0.005 285.823);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.985 0 0);
-  --primary-foreground: oklch(0.21 0.006 285.885);
-  --secondary: oklch(0.274 0.006 286.033);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.274 0.006 286.033);
-  --muted-foreground: oklch(0.705 0.015 286.067);
-  --accent: oklch(0.274 0.006 286.033);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.396 0.141 25.723);
-  --destructive-foreground: oklch(0.637 0.237 25.331);
-  --border: oklch(0.274 0.006 286.033);
-  --input: oklch(0.274 0.006 286.033);
-  --ring: oklch(0.442 0.017 285.786);
+  --secondary: oklch(0.955 0.008 86.6);
+  --secondary-foreground: oklch(0.298 0.018 73.2);
+  --muted: oklch(0.951 0.006 84.8);
+  --muted-foreground: oklch(0.486 0.018 74.8);
+  --accent: oklch(0.939 0.012 87.4);
+  --accent-foreground: oklch(0.266 0.016 74.1);
+  --destructive: oklch(0.61 0.213 27.3);
+  --destructive-foreground: oklch(0.985 0 0);
+  --border: oklch(0.892 0.01 84.4);
+  --input: oklch(0.882 0.01 84);
+  --ring: oklch(0.57 0.026 74.9);
+  --radius: 0.5rem;
+  --shadow-strong: 0 12px 32px rgb(0 0 0 / 0.07);
+  --shadow-soft: 0 4px 14px rgb(0 0 0 / 0.05);
+  --font-sans:
+    "Inter", "SF Pro Text", -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen", "Ubuntu", "Cantarell",
+    "Helvetica Neue", Arial, sans-serif;
+  --font-mono:
+    "SF Mono", "JetBrains Mono", ui-monospace, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  --header-height: 3.5rem;
 }
 
 @theme inline {
@@ -84,9 +55,15 @@ code {
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
 }
 
 @layer base {
+  html {
+    color-scheme: light;
+  }
+
   * {
     @apply border-border outline-ring/50;
   }
@@ -98,11 +75,39 @@ code {
   }
 
   body {
-    @apply bg-background text-foreground;
+    margin: 0;
+    @apply bg-background text-foreground font-sans antialiased;
+    background-image: radial-gradient(circle at top, oklch(1 0 0), transparent 55%);
+  }
+
+  code,
+  pre {
+    font-family: var(--font-mono);
+  }
+
+  code {
+    @apply rounded-[4px] bg-muted px-1.5 py-0.5 text-[0.9em] text-foreground;
   }
 }
 
-.page-wrap {
-  width: min(1100px, calc(100% - 2rem));
-  margin-inline: auto;
+@layer components {
+  .page-wrap {
+    width: min(1200px, calc(100% - 2rem));
+    margin-inline: auto;
+  }
+
+  .page-main {
+    @apply py-8 md:py-10;
+  }
+
+  .panel-surface {
+    border: 1px solid color-mix(in oklch, var(--border) 86%, white 14%);
+    box-shadow: var(--shadow-strong);
+    @apply rounded-xl bg-card;
+  }
+
+  .panel-muted {
+    box-shadow: var(--shadow-soft);
+    @apply rounded-lg border bg-muted/40;
+  }
 }

@@ -56,7 +56,7 @@ Or directly:
 pnpm --filter viewer dev
 ```
 
-Default dev server: `http://localhost:3000`
+Default dev server: `http://localhost:4000`
 
 ## Build and Test
 

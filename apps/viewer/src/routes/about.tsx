@@ -1,4 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
+import { Badge } from '../components/ui/badge'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
+import { Separator } from '../components/ui/separator'
 
 export const Route = createFileRoute('/about')({
   component: About,
@@ -6,14 +9,30 @@ export const Route = createFileRoute('/about')({
 
 function About() {
   return (
-    <main className="page-wrap px-4 py-6">
-      <section className="rounded-lg border border-border bg-card p-6">
-        <h1 className="mb-3 text-2xl font-semibold">About the Viewer</h1>
-        <p className="m-0 max-w-3xl text-sm leading-6 text-muted-foreground">
-          This app previews MaterialX documents with the <code>@materialx-js/materialx-three</code> compiler and a live
-          Three.js rendering viewport. Use it to test sample graphs, import custom files, and inspect diagnostics.
-        </p>
-      </section>
-    </main>
+    <div className="page-wrap">
+      <Card className="panel-surface">
+        <CardHeader className="space-y-3">
+          <Badge className="w-fit" variant="secondary">
+            Overview
+          </Badge>
+          <CardTitle className="text-2xl">About the Viewer</CardTitle>
+          <CardDescription className="max-w-3xl text-sm leading-6">
+            This viewer previews MaterialX documents with the <code>@materialx-js/materialx-three</code> compiler and a
+            live Three.js rendering viewport.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4 text-sm text-muted-foreground">
+          <p className="m-0">
+            Use it to load built-in examples, import your own <code>.mtlx</code> bundles with related textures, and
+            inspect diagnostics while iterating on material graphs.
+          </p>
+          <Separator />
+          <p className="m-0">
+            The redesigned interface emphasizes a documentation-style layout, neutral color palette, and composable UI
+            primitives while preserving all existing runtime and compilation behavior.
+          </p>
+        </CardContent>
+      </Card>
+    </div>
   )
 }
