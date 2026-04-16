@@ -15,6 +15,10 @@ const makeSampleId = (directory: string): string => {
   return directory.trim().toLowerCase().replaceAll('_', '-').replaceAll(' ', '-')
 }
 
+const normalizeMaterialName = (value: string): string => {
+  return value.trim().toLowerCase().replaceAll('_', '-').replaceAll(' ', '-')
+}
+
 const toPosixPath = (value: string): string => value.replaceAll(path.sep, '/')
 
 const toTitleCase = (value: string): string => {
@@ -132,6 +136,17 @@ export const getMaterialXSamplePacksCached = async (): Promise<MaterialXSamplePa
     })
 
   return samplesPromise
+}
+
+export const getMaterialXSamplePackByMaterialName = async (
+  materialName: string,
+): Promise<MaterialXSamplePack | undefined> => {
+  const samples = await getMaterialXSamplePacksCached()
+  const normalized = normalizeMaterialName(materialName)
+
+  return samples.find((entry) => {
+    return normalizeMaterialName(entry.id) === normalized || normalizeMaterialName(entry.directory) === normalized
+  })
 }
 
 const createAssetMap = (sample: MaterialXSamplePack): Record<string, string> => {

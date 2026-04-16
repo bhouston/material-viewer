@@ -6,7 +6,6 @@ import {
   BoxGeometry,
   DirectionalLight,
   EquirectangularReflectionMapping,
-  Group,
   Mesh,
   MeshStandardMaterial,
   PlaneGeometry,
@@ -16,6 +15,7 @@ import {
   Vector3,
   WebGLRenderer,
 } from 'three'
+import type { Group } from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import { HDRLoader } from 'three/addons/loaders/HDRLoader.js'
@@ -31,7 +31,8 @@ interface ViewerProps {
   nodeMaterial?: MeshPhysicalNodeMaterial
   backgroundMaterial?: MeshPhysicalNodeMaterial
   previewGeometry: PreviewGeometry
-  captureMode?: boolean
+  fixedSize?: number
+  viewportClassName?: string
   onRendererLabelChange: (label: string) => void
   onPreviewGeometryErrorChange: (message?: string) => void
   onPreviewGeometryFallback: (geometry: PreviewGeometry) => void
@@ -78,12 +79,13 @@ const normalizePreviewModel = (root: Group, targetSize: number) => {
   root.position.set(root.position.x - center.x * scale, root.position.y - center.y * scale, root.position.z - center.z * scale)
 }
 
-const Viewer = forwardRef<ViewerHandle, ViewerProps>(function Viewer(
+const Viewer = forwardRef<ViewerHandle, ViewerProps>(function ViewerImpl(
   {
     nodeMaterial,
     backgroundMaterial,
     previewGeometry,
-    captureMode,
+    fixedSize,
+    viewportClassName,
     onRendererLabelChange,
     onPreviewGeometryErrorChange,
     onPreviewGeometryFallback,
@@ -173,7 +175,8 @@ const Viewer = forwardRef<ViewerHandle, ViewerProps>(function Viewer(
         normalizePreviewModel(totemRoot, PREVIEW_TARGET_SIZE)
         const allMeshes: Mesh[] = []
         totemRoot.traverse((entry) => {
-          if ((entry as Mesh).isMesh) {
+          const maybeMesh = entry as { isMesh?: boolean }
+          if (maybeMesh.isMesh === true) {
             allMeshes.push(entry as Mesh)
           }
         })
@@ -281,8 +284,8 @@ const Viewer = forwardRef<ViewerHandle, ViewerProps>(function Viewer(
 
       const resize = () => {
         const viewport = viewportRef.current
-        const width = captureMode ? 512 : Math.max(1, Math.floor(viewport?.clientWidth ?? 640))
-        const height = captureMode ? 512 : Math.max(1, Math.floor(viewport?.clientHeight ?? 360))
+        const width = fixedSize ?? Math.max(1, Math.floor(viewport?.clientWidth ?? 640))
+        const height = fixedSize ?? Math.max(1, Math.floor(viewport?.clientHeight ?? 360))
         camera.aspect = width / height
         camera.updateProjectionMatrix()
         renderer.setSize(width, height, false)
@@ -336,8 +339,9 @@ const Viewer = forwardRef<ViewerHandle, ViewerProps>(function Viewer(
         materialCubeRef.current = null
         materialPlaneRef.current = null
         materialTotemRootRef.current?.traverse((entry) => {
-          if ((entry as Mesh).isMesh) {
-            ;(entry as Mesh).geometry.dispose()
+          const maybeMesh = entry as { isMesh?: boolean; geometry?: { dispose: () => void } }
+          if (maybeMesh.isMesh === true) {
+            maybeMesh.geometry?.dispose()
           }
         })
         materialTotemRootRef.current = null
@@ -414,18 +418,17 @@ const Viewer = forwardRef<ViewerHandle, ViewerProps>(function Viewer(
     <div
       ref={viewportRef}
       className={
-        captureMode
-          ? 'h-[512px] w-[512px] overflow-hidden rounded-lg border border-border/90 bg-background shadow-inner'
-          : 'h-[420px] w-full overflow-hidden rounded-lg border border-border/90 bg-background shadow-inner'
+        viewportClassName ?? 'h-[420px] w-full overflow-hidden rounded-lg border border-border/90 bg-background shadow-inner'
       }
       data-testid="viewer-render-target"
+      style={fixedSize ? { width: fixedSize, height: fixedSize } : undefined}
     >
       <canvas
         ref={canvasRef}
         className="block h-full w-full"
         data-testid="viewer-canvas"
-        height={captureMode ? 512 : undefined}
-        width={captureMode ? 512 : undefined}
+        height={fixedSize}
+        width={fixedSize}
       />
     </div>
   )

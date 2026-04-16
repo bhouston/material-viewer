@@ -17,7 +17,7 @@ const main = async (): Promise<void> => {
   try {
     const { browser, page } = await openViewerBrowserPage(server.url)
     try {
-      const samples = await getViewerSamples(page)
+      const samples = await getViewerSamples()
       if (samples.length === 0) {
         throw new Error('No samples were found in the viewer sample selector')
       }

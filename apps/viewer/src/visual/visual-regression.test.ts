@@ -9,8 +9,8 @@ import {
   readViewerHealthReport,
   resetViewerRuntimeState,
   startViewerPreviewServer,
-  type ViewerServerHandle,
 } from './playwright-harness'
+import type { ViewerServerHandle } from './playwright-harness'
 
 describe('viewer visual regression', () => {
   let server: ViewerServerHandle | undefined
@@ -45,7 +45,7 @@ describe('viewer visual regression', () => {
       if (!page) {
         throw new Error('Playwright page was not initialized')
       }
-      const samples = await getViewerSamples(page)
+      const samples = await getViewerSamples()
       expect(samples.length).toBeGreaterThan(0)
       const sampleIdsFilter = process.env.VIEWER_SAMPLE_IDS
         ?.split(',')

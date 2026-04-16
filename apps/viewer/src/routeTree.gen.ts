@@ -9,12 +9,13 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as CaptureRouteImport } from './routes/capture'
+import { Route as EmbedRouteImport } from './routes/embed'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ApiAssetSplatRouteImport } from './routes/api/asset/$'
 
-const CaptureRoute = CaptureRouteImport.update({
-  id: '/capture',
-  path: '/capture',
+const EmbedRoute = EmbedRouteImport.update({
+  id: '/embed',
+  path: '/embed',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -22,40 +23,49 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiAssetSplatRoute = ApiAssetSplatRouteImport.update({
+  id: '/api/asset/$',
+  path: '/api/asset/$',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/capture': typeof CaptureRoute
+  '/embed': typeof EmbedRoute
+  '/api/asset/$': typeof ApiAssetSplatRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/capture': typeof CaptureRoute
+  '/embed': typeof EmbedRoute
+  '/api/asset/$': typeof ApiAssetSplatRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/capture': typeof CaptureRoute
+  '/embed': typeof EmbedRoute
+  '/api/asset/$': typeof ApiAssetSplatRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/capture'
+  fullPaths: '/' | '/embed' | '/api/asset/$'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/capture'
-  id: '__root__' | '/' | '/capture'
+  to: '/' | '/embed' | '/api/asset/$'
+  id: '__root__' | '/' | '/embed' | '/api/asset/$'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  CaptureRoute: typeof CaptureRoute
+  EmbedRoute: typeof EmbedRoute
+  ApiAssetSplatRoute: typeof ApiAssetSplatRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/capture': {
-      id: '/capture'
-      path: '/capture'
-      fullPath: '/capture'
-      preLoaderRoute: typeof CaptureRouteImport
+    '/embed': {
+      id: '/embed'
+      path: '/embed'
+      fullPath: '/embed'
+      preLoaderRoute: typeof EmbedRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -65,12 +75,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/asset/$': {
+      id: '/api/asset/$'
+      path: '/api/asset/$'
+      fullPath: '/api/asset/$'
+      preLoaderRoute: typeof ApiAssetSplatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  CaptureRoute: CaptureRoute,
+  EmbedRoute: EmbedRoute,
+  ApiAssetSplatRoute: ApiAssetSplatRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

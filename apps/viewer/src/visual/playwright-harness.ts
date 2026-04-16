@@ -3,7 +3,9 @@ import { mkdir, writeFile } from 'node:fs/promises'
 import { createServer } from 'node:net'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { chromium, type Browser, type Page } from 'playwright'
+import { chromium } from 'playwright'
+import type { Browser, Page } from 'playwright'
+import { getMaterialXSamplePacksCached } from '../lib/materialx-samples.server'
 
 const DEFAULT_VISUAL_PORT = Number.parseInt(process.env.VIEWER_VISUAL_PORT ?? '4173', 10)
 const VISUAL_HOST = process.env.VIEWER_VISUAL_HOST ?? '127.0.0.1'
@@ -59,7 +61,6 @@ export interface ViewerSampleEntry {
 }
 
 export interface ViewerHealthReport {
-  dropMessage: string
   compileErrorMessage?: string
   warningCount: number
   unsupportedCategoryCount: number
@@ -126,20 +127,20 @@ export const openViewerBrowserPage = async (baseUrl: string): Promise<{ browser:
   const browser = await launchBrowser()
   const page = await browser.newPage({
     viewport: {
-      width: 1400,
-      height: 1200,
+      width: 512,
+      height: 512,
     },
   })
   const start = Date.now()
-  const captureUrl = `${baseUrl}/capture`
-  while (true) {
+  const embedUrl = `${baseUrl}/embed?url=${encodeURIComponent('/api/asset/open-pbr-soapbubble.mtlx.zip')}&model=sphere&background=checkerboard`
+  for (;;) {
     try {
-      await page.goto(captureUrl, { waitUntil: 'domcontentloaded', timeout: 120_000 })
-      await page.locator('[data-testid="sample-select"]').waitFor({ timeout: 10_000 })
+      await page.goto(embedUrl, { waitUntil: 'domcontentloaded', timeout: 120_000 })
+      await page.locator('[data-testid="viewer-render-target"]').waitFor({ timeout: 10_000 })
       break
     } catch (error) {
       if (Date.now() - start > 180_000) {
-        throw new Error(`Could not open ${captureUrl}: ${error instanceof Error ? error.message : String(error)}`)
+        throw new Error(`Could not open ${embedUrl}: ${error instanceof Error ? error.message : String(error)}`)
       }
       await sleep(500)
     }
@@ -147,16 +148,13 @@ export const openViewerBrowserPage = async (baseUrl: string): Promise<{ browser:
   return { browser, page }
 }
 
-export const getViewerSamples = async (page: Page): Promise<ViewerSampleEntry[]> => {
-  return page.locator('[data-testid="sample-select"] option').evaluateAll((options) => {
-    return options
-      .map((option) => ({
-        id: (option as HTMLOptionElement).value,
-        label: option.textContent?.trim() ?? '',
-        directory: (option as HTMLOptionElement).dataset.directory ?? '',
-      }))
-      .filter((entry) => entry.id.length > 0 && entry.directory.length > 0)
-  })
+export const getViewerSamples = async (): Promise<ViewerSampleEntry[]> => {
+  const samples = await getMaterialXSamplePacksCached()
+  return samples.map((sample) => ({
+    id: sample.id,
+    label: sample.label,
+    directory: sample.directory,
+  }))
 }
 
 export const resetViewerRuntimeState = async (page: Page): Promise<void> => {
@@ -178,20 +176,19 @@ export const resetViewerRuntimeState = async (page: Page): Promise<void> => {
 }
 
 const waitForDiagnosticsUpdate = async (page: Page): Promise<void> => {
-  await page.waitForTimeout(150)
+  await page.waitForTimeout(250)
   await page.locator('[data-testid="compile-diagnostics"]').waitFor()
-  await page.waitForFunction(() => {
-    const errorMessage = document.querySelector('[data-testid="compile-error-message"]')?.textContent?.trim()
-    return errorMessage !== 'Preparing client-side compiler...' && errorMessage !== 'Loading sample...'
-  })
   await page.waitForTimeout(100)
 }
 
 const waitForCanvasReady = async (page: Page): Promise<void> => {
   await page.waitForFunction(
     () => {
-      const canvas = document.querySelector('[data-testid="viewer-canvas"]') as HTMLCanvasElement | null
-      return canvas !== null && canvas.width > 0 && canvas.height > 0
+      const canvas = document.querySelector('[data-testid="viewer-canvas"]')
+      if (!(canvas instanceof HTMLCanvasElement)) {
+        return false
+      }
+      return canvas.width > 0 && canvas.height > 0
     },
   )
 }
@@ -215,14 +212,8 @@ const waitForViewerSettled = async (page: Page): Promise<void> => {
 }
 
 export const loadSampleInViewer = async (page: Page, sample: ViewerSampleEntry): Promise<void> => {
-  await page.locator('[data-testid="sample-select"]').selectOption(sample.id)
-  await page.waitForFunction(
-    ({ expected }) => {
-      const active = document.querySelector('[data-testid="active-source-label"]')
-      return active?.textContent?.trim() === expected
-    },
-    { expected: sample.label },
-  )
+  const embedUrl = `/embed?url=${encodeURIComponent(`/api/asset/${sample.id}.mtlx.zip`)}&model=sphere&background=checkerboard`
+  await page.goto(new URL(embedUrl, page.url()).toString(), { waitUntil: 'domcontentloaded' })
   await waitForDiagnosticsUpdate(page)
   await waitForCanvasReady(page)
   await waitForViewerSettled(page)
@@ -238,15 +229,16 @@ export const readViewerHealthReport = async (page: Page): Promise<ViewerHealthRe
       }
     }
     const diagnostics = document.querySelector('[data-testid="compile-diagnostics"]')
-    const dropMessage = document.querySelector('[data-testid="drop-message"]')?.textContent?.trim() ?? ''
-    const compileErrorMessage = document.querySelector('[data-testid="compile-error-message"]')?.textContent?.trim()
-    const backgroundErrorMessage = document.querySelector('[data-testid="background-error-message"]')?.textContent?.trim()
-    const previewGeometryErrorMessage = document
-      .querySelector('[data-testid="preview-geometry-error-message"]')
-      ?.textContent?.trim()
+    const compileErrorElement = document.querySelector('[data-testid="compile-error-message"]')
+    const backgroundErrorElement = document.querySelector('[data-testid="background-error-message"]')
+    const previewGeometryErrorElement = document.querySelector('[data-testid="preview-geometry-error-message"]')
+    const compileErrorMessage = compileErrorElement ? compileErrorElement.textContent.trim() || undefined : undefined
+    const backgroundErrorMessage = backgroundErrorElement ? backgroundErrorElement.textContent.trim() || undefined : undefined
+    const previewGeometryErrorMessage = previewGeometryErrorElement
+      ? previewGeometryErrorElement.textContent.trim() || undefined
+      : undefined
 
     return {
-      dropMessage,
       compileErrorMessage,
       warningCount: Number.parseInt(diagnostics?.getAttribute('data-warning-count') ?? '0', 10),
       unsupportedCategoryCount: Number.parseInt(diagnostics?.getAttribute('data-unsupported-category-count') ?? '0', 10),
@@ -279,9 +271,6 @@ export const assertViewerHealthy = (sample: ViewerSampleEntry, report: ViewerHea
   }
   if (report.previewGeometryErrorMessage) {
     failures.push(`preview geometry error: ${report.previewGeometryErrorMessage}`)
-  }
-  if (report.dropMessage.toLowerCase().includes('could not')) {
-    failures.push(`load message indicates failure: ${report.dropMessage}`)
   }
   if (report.consoleErrors.length > 0) {
     failures.push(`console errors: ${report.consoleErrors.join(' | ')}`)

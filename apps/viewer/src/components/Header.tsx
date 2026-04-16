@@ -6,7 +6,7 @@ export default function Header() {
   return (
     <header className="sticky top-0 z-40 border-b border-border/90 bg-background/95 px-4 backdrop-blur-sm">
       <nav className="page-wrap flex h-14 items-center gap-4">
-        <Link className="inline-flex items-center gap-2 text-foreground no-underline" search={{ capture: undefined, material: undefined }} to="/">
+        <Link className="inline-flex items-center gap-2 text-foreground no-underline" search={{ material: undefined }} to="/">
           <span className="grid size-8 place-items-center rounded-md border border-border bg-card shadow-[var(--shadow-soft)]">
             <Box className="size-4" />
           </span>
