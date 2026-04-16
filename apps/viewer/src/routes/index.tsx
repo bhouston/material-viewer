@@ -1,4 +1,4 @@
-import { ClientOnly, createFileRoute, useHydrated, useNavigate } from '@tanstack/react-router';
+import { createFileRoute, useHydrated, useNavigate } from '@tanstack/react-router';
 import { Check, Code2, Copy, Download } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { z } from 'zod';
@@ -256,7 +256,7 @@ function App() {
         >
           <option value="">None</option>
           {[...samplePacks]
-            .sort((a, b) => a.directory.localeCompare(b.directory))
+            .toSorted((a, b) => a.directory.localeCompare(b.directory))
             .map((sample) => (
               <option key={sample.id} data-directory={sample.directory} value={sample.id}>
                 {sample.directory}
@@ -339,15 +339,7 @@ function App() {
           type="file"
         />
         {materialLoaded ? (
-          <ClientOnly
-            fallback={
-              <div className="flex h-[420px] w-full items-center justify-center rounded-lg border border-border/90 bg-muted/40">
-                <p className="text-sm text-muted-foreground">Initializing 3D viewport...</p>
-              </div>
-            }
-          >
-            {viewportElement}
-          </ClientOnly>
+          viewportElement
         ) : (
           <button
             className="flex min-h-[400px] w-full cursor-pointer items-center justify-center rounded-lg bg-transparent outline-none focus-visible:ring-2 focus-visible:ring-ring"

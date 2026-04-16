@@ -1,3 +1,4 @@
+import { ClientOnly } from '@tanstack/react-router';
 import { useEffect, useRef, useState } from 'react';
 import type { MeshPhysicalNodeMaterial } from 'three/webgpu';
 import type { MaterialXBackgroundPack } from '../lib/backgrounds';
@@ -20,6 +21,7 @@ interface MaterialViewportProps {
   lockPreviewGeometry?: boolean;
   lockBackground?: boolean;
   showControls?: boolean;
+  enableOrbitControls?: boolean;
   variant?: 'panel' | 'bare';
   viewerClassName?: string;
   viewerFixedSize?: number;
@@ -37,6 +39,7 @@ export default function MaterialViewport({
   lockPreviewGeometry = false,
   lockBackground = false,
   showControls = true,
+  enableOrbitControls = showControls,
   variant = 'panel',
   viewerClassName,
   viewerFixedSize,
@@ -59,18 +62,36 @@ export default function MaterialViewport({
     viewerRef.current?.resetView();
   };
 
+  const resolvedViewerClassName =
+    viewerClassName ?? 'h-[420px] w-full overflow-hidden rounded-lg border border-border/90 bg-background shadow-inner';
+
+  const viewerFallback = (
+    <div
+      className={resolvedViewerClassName}
+      data-testid="viewer-render-target"
+      style={viewerFixedSize ? { width: viewerFixedSize, height: viewerFixedSize } : undefined}
+    >
+      <div className="flex h-full w-full items-center justify-center bg-muted/40">
+        <p className="text-sm text-muted-foreground">Initializing 3D viewport...</p>
+      </div>
+    </div>
+  );
+
   const viewerElement = (
-    <Viewer
-      ref={viewerRef}
-      backgroundMaterial={backgroundMaterial}
-      fixedSize={viewerFixedSize}
-      nodeMaterial={nodeMaterial}
-      onPreviewGeometryErrorChange={setPreviewGeometryError}
-      onPreviewGeometryFallback={handlePreviewGeometryChange}
-      onRendererLabelChange={setRendererLabel}
-      previewGeometry={previewGeometry}
-      viewportClassName={viewerClassName}
-    />
+    <ClientOnly fallback={viewerFallback}>
+      <Viewer
+        ref={viewerRef}
+        backgroundMaterial={backgroundMaterial}
+        enableControls={enableOrbitControls}
+        fixedSize={viewerFixedSize}
+        nodeMaterial={nodeMaterial}
+        onPreviewGeometryErrorChange={setPreviewGeometryError}
+        onPreviewGeometryFallback={handlePreviewGeometryChange}
+        onRendererLabelChange={setRendererLabel}
+        previewGeometry={previewGeometry}
+        viewportClassName={resolvedViewerClassName}
+      />
+    </ClientOnly>
   );
 
   const controlBlock = showControls ? (

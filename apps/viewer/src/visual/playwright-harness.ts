@@ -140,7 +140,9 @@ export const openViewerBrowserPage = async (baseUrl: string): Promise<{ browser:
       break;
     } catch (error) {
       if (Date.now() - start > 180_000) {
-        throw new Error(`Could not open ${embedUrl}: ${error instanceof Error ? error.message : String(error)}`);
+        throw new Error(`Could not open ${embedUrl}: ${error instanceof Error ? error.message : String(error)}`, {
+          cause: error,
+        });
       }
       await sleep(500);
     }
@@ -298,8 +300,8 @@ export const captureViewerWebp = async (page: Page): Promise<Buffer> => {
   const webpDataUrl = await page.evaluate(async (pngBase64: string) => {
     const image = await new Promise<HTMLImageElement>((resolve, reject) => {
       const entry = new Image();
-      entry.onload = () => resolve(entry);
-      entry.onerror = () => reject(new Error('Could not decode render target PNG'));
+      entry.addEventListener('load', () => resolve(entry), { once: true });
+      entry.addEventListener('error', () => reject(new Error('Could not decode render target PNG')), { once: true });
       entry.src = `data:image/png;base64,${pngBase64}`;
     });
 
@@ -333,16 +335,18 @@ export const computeBaselineDiffRatio = async (page: Page, sample: ViewerSampleE
   const currentDataUrl = `data:image/png;base64,${currentCapture.toString('base64')}`;
   return page.evaluate(
     async ({ url, currentUrl }) => {
-      const loadImage = async (source: string): Promise<HTMLImageElement> =>
-        new Promise((resolve, reject) => {
-          const image = new Image();
-          image.onload = () => resolve(image);
-          image.onerror = () => reject(new Error(`Could not load image: ${source}`));
-          image.src = source;
-        });
-
-      const baseline = await loadImage(url);
-      const current = await loadImage(currentUrl);
+      const baseline = await new Promise<HTMLImageElement>((resolve, reject) => {
+        const image = new Image();
+        image.addEventListener('load', () => resolve(image), { once: true });
+        image.addEventListener('error', () => reject(new Error(`Could not load image: ${url}`)), { once: true });
+        image.src = url;
+      });
+      const current = await new Promise<HTMLImageElement>((resolve, reject) => {
+        const image = new Image();
+        image.addEventListener('load', () => resolve(image), { once: true });
+        image.addEventListener('error', () => reject(new Error(`Could not load image: ${currentUrl}`)), { once: true });
+        image.src = currentUrl;
+      });
       const baselineCanvas = document.createElement('canvas');
       baselineCanvas.width = 512;
       baselineCanvas.height = 512;

@@ -7,7 +7,7 @@ import { supportedNodeCategories } from '../mapping/mx-node-map.js';
 const sourceDir = path.dirname(fileURLToPath(import.meta.url));
 const reportPath = path.resolve(sourceDir, '../../SUPPORTED_NODES.md');
 
-const allCategories = [...new Set(materialXNodeRegistry.map((entry) => entry.category))].sort();
+const allCategories = [...new Set(materialXNodeRegistry.map((entry) => entry.category))].toSorted();
 const supported = allCategories.filter((entry) => supportedNodeCategories.has(entry));
 const unsupported = allCategories.filter((entry) => !supportedNodeCategories.has(entry));
 

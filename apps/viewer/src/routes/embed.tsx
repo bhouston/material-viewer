@@ -1,4 +1,4 @@
-import { ClientOnly, createFileRoute, useHydrated } from '@tanstack/react-router';
+import { createFileRoute, useHydrated } from '@tanstack/react-router';
 import { useEffect, useMemo } from 'react';
 import { z } from 'zod';
 import MaterialViewport from '../components/MaterialViewport';
@@ -80,28 +80,21 @@ function EmbedRouteComponent() {
   return (
     <div className="h-full w-full">
       <div className="h-full w-full" data-testid="drop-message">
-        <ClientOnly
-          fallback={
-            <div className="flex h-full w-full items-center justify-center bg-muted/40">
-              <p className="text-sm text-muted-foreground">Initializing 3D viewport...</p>
-            </div>
-          }
-        >
-          <MaterialViewport
-            backgroundError={backgroundError ?? backgroundCompileState.error}
-            backgroundMaterial={backgroundCompileState.material}
-            backgroundPacks={materialXBackgroundPacks}
-            initialPreviewGeometry={model}
-            lockBackground
-            lockPreviewGeometry
-            nodeMaterial={compileState.material}
-            onBackgroundChange={(backgroundId) => void onBackgroundChange(backgroundId)}
-            selectedBackground={selectedBackground}
-            showControls={false}
-            variant="bare"
-            viewerClassName="h-full w-full overflow-hidden bg-background"
-          />
-        </ClientOnly>
+        <MaterialViewport
+          backgroundError={backgroundError ?? backgroundCompileState.error}
+          backgroundMaterial={backgroundCompileState.material}
+          backgroundPacks={materialXBackgroundPacks}
+          enableOrbitControls={false}
+          initialPreviewGeometry={model}
+          lockBackground
+          lockPreviewGeometry
+          nodeMaterial={compileState.material}
+          onBackgroundChange={(backgroundId) => void onBackgroundChange(backgroundId)}
+          selectedBackground={selectedBackground}
+          showControls={false}
+          variant="bare"
+          viewerClassName="h-full w-full overflow-hidden bg-background"
+        />
       </div>
       <div
         className="sr-only"

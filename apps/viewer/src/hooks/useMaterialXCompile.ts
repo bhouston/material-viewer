@@ -1,6 +1,6 @@
 import { parseMaterialX } from '@materialx-js/materialx/dist/xml.js';
 import { createThreeMaterialFromDocument } from '@materialx-js/materialx-three';
-import { useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { createBrowserTextureResolver } from '../lib/browser-texture-resolver';
 
 interface UseMaterialXCompileOptions {
@@ -10,7 +10,7 @@ interface UseMaterialXCompileOptions {
 }
 
 export const useMaterialXCompile = ({ xml, assetUrls, hydrated }: UseMaterialXCompileOptions) => {
-  return useMemo(() => {
+  const compileState = useMemo(() => {
     if (!hydrated || !xml.trim()) {
       return { error: undefined, result: undefined, material: undefined };
     }
@@ -29,4 +29,23 @@ export const useMaterialXCompile = ({ xml, assetUrls, hydrated }: UseMaterialXCo
       };
     }
   }, [assetUrls, hydrated, xml]);
+
+  const previousMaterialRef = useRef(compileState.material);
+
+  useEffect(() => {
+    const previousMaterial = previousMaterialRef.current;
+    if (previousMaterial && previousMaterial !== compileState.material) {
+      previousMaterial.dispose();
+    }
+    previousMaterialRef.current = compileState.material;
+  }, [compileState.material]);
+
+  useEffect(() => {
+    return () => {
+      previousMaterialRef.current?.dispose();
+      previousMaterialRef.current = undefined;
+    };
+  }, []);
+
+  return compileState;
 };

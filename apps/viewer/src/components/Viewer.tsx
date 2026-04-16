@@ -1,28 +1,10 @@
-import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react';
-import {
-  AmbientLight,
-  BackSide,
-  type BufferGeometry,
-  Box3,
-  BoxGeometry,
-  DirectionalLight,
-  EquirectangularReflectionMapping,
-  Mesh,
-  MeshStandardMaterial,
-  PlaneGeometry,
-  PerspectiveCamera,
-  Scene,
-  SphereGeometry,
-  Vector3,
-  WebGLRenderer,
-} from 'three';
-import type { Group } from 'three';
-import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { HDRLoader } from 'three/addons/loaders/HDRLoader.js';
-import * as MikkTSpace from 'three/addons/libs/mikktspace.module.js';
-import { computeMikkTSpaceTangents } from 'three/addons/utils/BufferGeometryUtils.js';
+import { Canvas, type RootState } from '@react-three/fiber';
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef } from 'react';
+import type { PerspectiveCamera } from 'three';
 import type { MeshPhysicalNodeMaterial } from 'three/webgpu';
+import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
+import { ViewerScene } from './viewer/ViewerScene';
+import { createViewerRenderer } from './viewer/renderer-factory';
 
 export type PreviewGeometry = 'totem' | 'sphere' | 'cube' | 'plane';
 
@@ -35,74 +17,14 @@ interface ViewerProps {
   backgroundMaterial?: MeshPhysicalNodeMaterial;
   previewGeometry: PreviewGeometry;
   fixedSize?: number;
+  enableControls?: boolean;
   viewportClassName?: string;
   onRendererLabelChange: (label: string) => void;
   onPreviewGeometryErrorChange: (message?: string) => void;
   onPreviewGeometryFallback: (geometry: PreviewGeometry) => void;
 }
 
-const ENV_MAP_URL = 'https://api.landofassets.com/media/BenHouston3D/Samples/PaulLobeHaus/image/hdr';
 const DEFAULT_CAMERA_POSITION = { x: 0, y: 0, z: 3.2 };
-const TOTEM_MODEL_URL = '/models/totem.glb';
-const PREVIEW_TARGET_SIZE = 1.8;
-
-const ensureTangents = async (geometry: BufferGeometry): Promise<boolean> => {
-  if (geometry.getAttribute('tangent')) {
-    return true;
-  }
-  if (!geometry.getAttribute('position') || !geometry.getAttribute('normal') || !geometry.getAttribute('uv')) {
-    return false;
-  }
-  try {
-    await MikkTSpace.ready;
-    computeMikkTSpaceTangents(geometry, MikkTSpace);
-    return true;
-  } catch (error) {
-    // Keep rendering if tangent generation fails for a geometry.
-    console.warn('Failed to compute tangents for preview geometry', error);
-    return false;
-  }
-};
-
-const createUvPlaneGeometry = (size: number) => {
-  const geometry = new PlaneGeometry(size, size, 1, 1);
-  const half = size / 2;
-  const position = geometry.getAttribute('position');
-  const uv = geometry.getAttribute('uv');
-
-  for (let index = 0; index < uv.count; index += 1) {
-    uv.setXY(index, position.getX(index) / half, position.getY(index) / half);
-  }
-  uv.needsUpdate = true;
-
-  return geometry;
-};
-
-const normalizePreviewModel = (root: Group, targetSize: number) => {
-  root.updateWorldMatrix(true, true);
-  const box = new Box3().setFromObject(root);
-  if (box.isEmpty()) {
-    return;
-  }
-
-  const size = new Vector3();
-  const center = new Vector3();
-  box.getSize(size);
-  box.getCenter(center);
-
-  const maxDim = Math.max(size.x, size.y, size.z);
-  if (maxDim <= Number.EPSILON) {
-    return;
-  }
-
-  const scale = targetSize / maxDim;
-  root.scale.multiplyScalar(scale);
-  root.position.set(
-    root.position.x - center.x * scale,
-    root.position.y - center.y * scale,
-    root.position.z - center.z * scale,
-  );
-};
 
 const Viewer = forwardRef<ViewerHandle, ViewerProps>(function ViewerImpl(
   {
@@ -110,6 +32,7 @@ const Viewer = forwardRef<ViewerHandle, ViewerProps>(function ViewerImpl(
     backgroundMaterial,
     previewGeometry,
     fixedSize,
+    enableControls = true,
     viewportClassName,
     onRendererLabelChange,
     onPreviewGeometryErrorChange,
@@ -117,26 +40,11 @@ const Viewer = forwardRef<ViewerHandle, ViewerProps>(function ViewerImpl(
   },
   ref,
 ) {
-  const viewportRef = useRef<HTMLDivElement | null>(null);
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const materialSphereRef = useRef<Mesh | null>(null);
-  const materialCubeRef = useRef<Mesh | null>(null);
-  const materialPlaneRef = useRef<Mesh | null>(null);
-  const materialTotemRootRef = useRef<Group | null>(null);
-  const materialTotemMeshesRef = useRef<Mesh[]>([]);
-  const backgroundSphereRef = useRef<Mesh | null>(null);
-  const defaultMaterialRef = useRef<MeshStandardMaterial | null>(null);
-  const defaultBackgroundMaterialRef = useRef<MeshStandardMaterial | null>(null);
   const cameraRef = useRef<PerspectiveCamera | null>(null);
-  const controlsRef = useRef<OrbitControls | null>(null);
-  const previewGeometryRef = useRef<PreviewGeometry>(previewGeometry);
+  const controlsRef = useRef<OrbitControlsImpl | null>(null);
   const onRendererLabelChangeRef = useRef(onRendererLabelChange);
   const onPreviewGeometryErrorChangeRef = useRef(onPreviewGeometryErrorChange);
   const onPreviewGeometryFallbackRef = useRef(onPreviewGeometryFallback);
-
-  useEffect(() => {
-    previewGeometryRef.current = previewGeometry;
-  }, [previewGeometry]);
 
   useEffect(() => {
     onRendererLabelChangeRef.current = onRendererLabelChange;
@@ -163,310 +71,19 @@ const Viewer = forwardRef<ViewerHandle, ViewerProps>(function ViewerImpl(
     },
   }));
 
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) {
-      return;
-    }
-
-    let disposed = false;
-    let cleanup: (() => void) | undefined;
-
-    const start = async () => {
-      const scene = new Scene();
-      const camera = new PerspectiveCamera(40, 1, 0.1, 100);
-      camera.position.set(DEFAULT_CAMERA_POSITION.x, DEFAULT_CAMERA_POSITION.y, DEFAULT_CAMERA_POSITION.z);
-      camera.lookAt(0, 0, 0);
-      cameraRef.current = camera;
-
-      const sphereGeometry = new SphereGeometry(0.9, 96, 96);
-      const cubeGeometry = new BoxGeometry(1.45, 1.45, 1.45);
-      const planeGeometry = createUvPlaneGeometry(PREVIEW_TARGET_SIZE);
-      await ensureTangents(sphereGeometry);
-      await ensureTangents(cubeGeometry);
-      await ensureTangents(planeGeometry);
-
-      const defaultMaterial = new MeshStandardMaterial({ color: 0xc5d4db, metalness: 0, roughness: 0.5 });
-      const sphere = new Mesh(sphereGeometry, defaultMaterial);
-      const cube = new Mesh(cubeGeometry, defaultMaterial);
-      const plane = new Mesh(planeGeometry, defaultMaterial);
-      defaultMaterialRef.current = defaultMaterial;
-      materialSphereRef.current = sphere;
-      materialCubeRef.current = cube;
-      materialPlaneRef.current = plane;
-      sphere.visible = false;
-      cube.visible = false;
-      plane.visible = false;
-      scene.add(sphere);
-      scene.add(cube);
-      scene.add(plane);
-
-      try {
-        const gltf = await new GLTFLoader().loadAsync(TOTEM_MODEL_URL);
-        const totemRoot = gltf.scene;
-        normalizePreviewModel(totemRoot, PREVIEW_TARGET_SIZE);
-        const allMeshes: Mesh[] = [];
-        totemRoot.traverse((entry) => {
-          const maybeMesh = entry as { isMesh?: boolean };
-          if (maybeMesh.isMesh === true) {
-            allMeshes.push(entry as Mesh);
-          }
-        });
-        const totemGeometries = new Set<BufferGeometry>();
-        for (const mesh of allMeshes) {
-          const geometry = mesh.geometry;
-          if (geometry) {
-            totemGeometries.add(geometry);
-          }
-        }
-        for (const geometry of totemGeometries) {
-          void (await ensureTangents(geometry));
-        }
-        const namedMeshes = allMeshes.filter(
-          (mesh) => mesh.name === 'Calibration_Mesh' || mesh.name === 'Preview_Mesh',
-        );
-        materialTotemMeshesRef.current = namedMeshes.length > 0 ? namedMeshes : allMeshes;
-        materialTotemRootRef.current = totemRoot;
-        (totemRoot as unknown as { visible: boolean }).visible = true;
-        scene.add(totemRoot);
-        onPreviewGeometryErrorChangeRef.current(undefined);
-      } catch {
-        onPreviewGeometryErrorChangeRef.current(
-          'Could not load ShaderBall totem model; falling back to primitive previews.',
-        );
-        if (previewGeometryRef.current === 'totem') {
-          onPreviewGeometryFallbackRef.current('sphere');
-        }
-      }
-
-      const applyPreviewMaterial = (material: unknown) => {
-        const sphereMesh = materialSphereRef.current;
-        const cubeMesh = materialCubeRef.current;
-        const planeMesh = materialPlaneRef.current;
-        if (sphereMesh) {
-          (sphereMesh as unknown as { material: unknown }).material = material;
-        }
-        if (cubeMesh) {
-          (cubeMesh as unknown as { material: unknown }).material = material;
-        }
-        if (planeMesh) {
-          (planeMesh as unknown as { material: unknown }).material = material;
-        }
-        for (const mesh of materialTotemMeshesRef.current) {
-          (mesh as unknown as { material: unknown }).material = material;
-        }
-      };
-
-      const updatePreviewGeometryVisibility = (value: PreviewGeometry) => {
-        const sphereMesh = materialSphereRef.current;
-        const cubeMesh = materialCubeRef.current;
-        const planeMesh = materialPlaneRef.current;
-        const totemRoot = materialTotemRootRef.current;
-        if (sphereMesh) {
-          sphereMesh.visible = value === 'sphere';
-        }
-        if (cubeMesh) {
-          cubeMesh.visible = value === 'cube';
-        }
-        if (planeMesh) {
-          planeMesh.visible = value === 'plane';
-        }
-        if (totemRoot) {
-          (totemRoot as unknown as { visible: boolean }).visible = value === 'totem';
-        }
-      };
-
-      const defaultBackgroundMaterial = new MeshStandardMaterial({
-        color: 0x999999,
-        roughness: 1,
-        metalness: 0,
-        side: BackSide,
-      });
-      const backgroundSphere = new Mesh(new SphereGeometry(20, 64, 64), defaultBackgroundMaterial);
-      defaultBackgroundMaterialRef.current = defaultBackgroundMaterial;
-      backgroundSphereRef.current = backgroundSphere;
-      scene.add(backgroundSphere);
-
-      scene.add(new AmbientLight(0xffffff, 0.45));
-      const keyLight = new DirectionalLight(0xffffff, 1.1);
-      keyLight.position.set(2, 3, 4);
-      scene.add(keyLight);
-
-      let environmentTexture: Awaited<ReturnType<HDRLoader['loadAsync']>> | undefined;
-      try {
-        environmentTexture = await new HDRLoader().loadAsync(ENV_MAP_URL);
-        environmentTexture.mapping = EquirectangularReflectionMapping;
-        scene.environment = environmentTexture;
-      } catch (error) {
-        console.warn('Failed to load viewer environment map', error);
-      }
-
-      applyPreviewMaterial(nodeMaterial ?? defaultMaterial);
-      updatePreviewGeometryVisibility(previewGeometryRef.current);
-      (backgroundSphere as unknown as { material: unknown }).material = backgroundMaterial ?? defaultBackgroundMaterial;
-      if (backgroundMaterial) {
-        (backgroundMaterial as unknown as { side?: number }).side = BackSide;
-      }
-
-      let renderer:
-        | WebGLRenderer
-        | {
-            render: (scene: Scene, camera: PerspectiveCamera) => void;
-            setSize: (w: number, h: number) => void;
-            dispose: () => void;
-          };
-      const useWebGPU = typeof navigator !== 'undefined' && 'gpu' in navigator;
-      if (useWebGPU) {
-        try {
-          const webgpu = await import('three/webgpu');
-          const gpuRenderer = new webgpu.WebGPURenderer({ canvas, antialias: true });
-          await gpuRenderer.init();
-          renderer = gpuRenderer;
-          onRendererLabelChangeRef.current('WebGPU + TSL');
-        } catch {
-          renderer = new WebGLRenderer({ canvas, antialias: true });
-          onRendererLabelChangeRef.current('WebGL fallback');
-        }
-      } else {
-        renderer = new WebGLRenderer({ canvas, antialias: true });
-        onRendererLabelChangeRef.current('WebGL fallback');
-      }
-
-      const resize = () => {
-        const viewport = viewportRef.current;
-        const width = fixedSize ?? Math.max(1, Math.floor(viewport?.clientWidth ?? 640));
-        const height = fixedSize ?? Math.max(1, Math.floor(viewport?.clientHeight ?? 360));
-        camera.aspect = width / height;
-        camera.updateProjectionMatrix();
-        renderer.setSize(width, height, false);
-      };
-
-      resize();
-      const controls = new OrbitControls(camera, canvas);
-      controls.enablePan = false;
-      controls.enableDamping = true;
-      controlsRef.current = controls;
-      let resizeFrame = 0;
-      let frameId = 0;
-      const tick = () => {
-        if (disposed) {
-          return;
-        }
-        controls.update();
-        renderer.render(scene, camera);
-        frameId = window.requestAnimationFrame(tick);
-      };
-      tick();
-
-      const observer = new ResizeObserver(() => {
-        if (resizeFrame !== 0) {
-          return;
-        }
-        resizeFrame = window.requestAnimationFrame(() => {
-          resizeFrame = 0;
-          resize();
-        });
-      });
-      observer.observe(viewportRef.current ?? canvas);
-
-      cleanup = () => {
-        disposed = true;
-        observer.disconnect();
-        if (resizeFrame !== 0) {
-          window.cancelAnimationFrame(resizeFrame);
-        }
-        window.cancelAnimationFrame(frameId);
-        controls.dispose();
-        renderer.dispose();
-        environmentTexture?.dispose();
-        sphere.geometry.dispose();
-        cube.geometry.dispose();
-        plane.geometry.dispose();
-        defaultMaterial.dispose();
-        defaultBackgroundMaterial.dispose();
-        backgroundSphere.geometry.dispose();
-        materialSphereRef.current = null;
-        materialCubeRef.current = null;
-        materialPlaneRef.current = null;
-        materialTotemRootRef.current?.traverse((entry) => {
-          const maybeMesh = entry as { isMesh?: boolean; geometry?: { dispose: () => void } };
-          if (maybeMesh.isMesh === true) {
-            maybeMesh.geometry?.dispose();
-          }
-        });
-        materialTotemRootRef.current = null;
-        materialTotemMeshesRef.current = [];
-        backgroundSphereRef.current = null;
-        defaultMaterialRef.current = null;
-        defaultBackgroundMaterialRef.current = null;
-        cameraRef.current = null;
-        controlsRef.current = null;
-      };
-    };
-
-    void start();
-
-    return () => {
-      disposed = true;
-      cleanup?.();
-    };
+  const setCameraRef = useCallback((camera: PerspectiveCamera | null) => {
+    cameraRef.current = camera;
+  }, []);
+  const setControlsRef = useCallback((controls: OrbitControlsImpl | null) => {
+    controlsRef.current = controls;
   }, []);
 
-  useEffect(() => {
-    const sphere = materialSphereRef.current;
-    const cube = materialCubeRef.current;
-    const plane = materialPlaneRef.current;
-    const defaultMaterial = defaultMaterialRef.current;
-    const resolvedMaterial = nodeMaterial ?? defaultMaterial ?? sphere?.material ?? cube?.material ?? plane?.material;
-    if (sphere) {
-      (sphere as unknown as { material: unknown }).material = resolvedMaterial;
-    }
-    if (cube) {
-      (cube as unknown as { material: unknown }).material = resolvedMaterial;
-    }
-    if (plane) {
-      (plane as unknown as { material: unknown }).material = resolvedMaterial;
-    }
-    for (const mesh of materialTotemMeshesRef.current) {
-      (mesh as unknown as { material: unknown }).material = resolvedMaterial;
-    }
-  }, [nodeMaterial]);
-
-  useEffect(() => {
-    const sphere = materialSphereRef.current;
-    const cube = materialCubeRef.current;
-    const plane = materialPlaneRef.current;
-    const totemRoot = materialTotemRootRef.current;
-    if (sphere) {
-      sphere.visible = previewGeometry === 'sphere';
-    }
-    if (cube) {
-      cube.visible = previewGeometry === 'cube';
-    }
-    if (plane) {
-      plane.visible = previewGeometry === 'plane';
-    }
-    if (totemRoot) {
-      (totemRoot as unknown as { visible: boolean }).visible = previewGeometry === 'totem';
-    }
-  }, [previewGeometry]);
-
-  useEffect(() => {
-    const backgroundSphere = backgroundSphereRef.current;
-    if (!backgroundSphere) {
-      return;
-    }
-    const defaultBackgroundMaterial = defaultBackgroundMaterialRef.current;
-    if (backgroundMaterial) {
-      (backgroundMaterial as unknown as { side?: number }).side = BackSide;
-    }
-    (backgroundSphere as unknown as { material: unknown }).material =
-      backgroundMaterial ?? defaultBackgroundMaterial ?? backgroundSphere.material;
-  }, [backgroundMaterial]);
+  const handleCanvasCreated = useCallback((state: RootState) => {
+    state.gl.domElement.setAttribute('data-testid', 'viewer-canvas');
+  }, []);
 
   return (
     <div
-      ref={viewportRef}
       className={
         viewportClassName ??
         'h-[420px] w-full overflow-hidden rounded-lg border border-border/90 bg-background shadow-inner'
@@ -474,13 +91,35 @@ const Viewer = forwardRef<ViewerHandle, ViewerProps>(function ViewerImpl(
       data-testid="viewer-render-target"
       style={fixedSize ? { width: fixedSize, height: fixedSize } : undefined}
     >
-      <canvas
-        ref={canvasRef}
+      <Canvas
+        camera={{
+          fov: 40,
+          near: 0.1,
+          far: 100,
+          position: [DEFAULT_CAMERA_POSITION.x, DEFAULT_CAMERA_POSITION.y, DEFAULT_CAMERA_POSITION.z],
+        }}
         className="block h-full w-full"
-        data-testid="viewer-canvas"
-        height={fixedSize}
-        width={fixedSize}
-      />
+        dpr={[1, 2]}
+        gl={async (rendererOptions) =>
+          createViewerRenderer(rendererOptions, (label) => onRendererLabelChangeRef.current(label))
+        }
+        onCreated={handleCanvasCreated}
+      >
+        <ViewerScene
+          backgroundMaterial={backgroundMaterial}
+          enableControls={enableControls}
+          nodeMaterial={nodeMaterial}
+          onCameraReady={setCameraRef}
+          onControlsReady={setControlsRef}
+          onPreviewGeometryErrorChange={(message) => onPreviewGeometryErrorChangeRef.current(message)}
+          onPreviewGeometryFallback={(geometry) => {
+            if (previewGeometry === 'totem') {
+              onPreviewGeometryFallbackRef.current(geometry);
+            }
+          }}
+          previewGeometry={previewGeometry}
+        />
+      </Canvas>
     </div>
   );
 });

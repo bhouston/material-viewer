@@ -1,6 +1,6 @@
 import { parseMaterialX } from '@materialx-js/materialx/dist/xml.js';
 import { createThreeMaterialFromDocument } from '@materialx-js/materialx-three';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { loadMaterialXBackgroundPack, materialXBackgroundPacks } from '../lib/backgrounds';
 
 const DEFAULT_BACKGROUND = materialXBackgroundPacks[0]?.id ?? 'checkerboard';
@@ -52,6 +52,23 @@ export const useMaterialXBackground = (hydrated: boolean, initialBackground = DE
       };
     }
   }, [backgroundXml, hydrated]);
+
+  const previousMaterialRef = useRef(backgroundCompileState.material);
+
+  useEffect(() => {
+    const previousMaterial = previousMaterialRef.current;
+    if (previousMaterial && previousMaterial !== backgroundCompileState.material) {
+      previousMaterial.dispose();
+    }
+    previousMaterialRef.current = backgroundCompileState.material;
+  }, [backgroundCompileState.material]);
+
+  useEffect(() => {
+    return () => {
+      previousMaterialRef.current?.dispose();
+      previousMaterialRef.current = undefined;
+    };
+  }, []);
 
   return {
     selectedBackground,

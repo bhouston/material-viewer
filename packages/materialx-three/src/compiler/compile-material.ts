@@ -109,8 +109,10 @@ export const compileMaterialXToTSL = (
   }
 
   const coveredCategories = getCoveredCategories(document);
-  const supportedCategories = [...coveredCategories].filter((entry) => supportedNodeCategories.has(entry)).sort();
-  const unsupportedCategories = [...coveredCategories].filter((entry) => !supportedNodeCategories.has(entry)).sort();
+  const supportedCategories = [...coveredCategories].filter((entry) => supportedNodeCategories.has(entry)).toSorted();
+  const unsupportedCategories = [...coveredCategories]
+    .filter((entry) => !supportedNodeCategories.has(entry))
+    .toSorted();
 
   return {
     materialName: materialNode.name,

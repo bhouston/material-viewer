@@ -99,7 +99,7 @@ const loadSamplesFromFs = async (): Promise<MaterialXSamplePack[]> => {
       (await readFirstLine(path.join(sampleRoot, LEGACY_LABEL_FILENAME))) ??
       toTitleCase(directory);
 
-    const assets = (await scanAssetFiles(sampleRoot)).sort((a, b) => a.localeCompare(b));
+    const assets = (await scanAssetFiles(sampleRoot)).toSorted((a, b) => a.localeCompare(b));
 
     samples.push({
       id: makeSampleId(directory),
@@ -110,7 +110,7 @@ const loadSamplesFromFs = async (): Promise<MaterialXSamplePack[]> => {
     });
   }
 
-  return samples.sort((a, b) => a.label.localeCompare(b.label));
+  return samples.toSorted((a, b) => a.label.localeCompare(b.label));
 };
 
 export const getMaterialXSamplePacksCached = async (): Promise<MaterialXSamplePack[]> => {
