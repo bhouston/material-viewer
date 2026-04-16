@@ -8,48 +8,84 @@ import { compileMaterialXToTSL, createThreeMaterialFromDocument } from './compil
 const sourceDir = path.dirname(fileURLToPath(import.meta.url));
 const standardSurfaceFixture = path.resolve(
   sourceDir,
-  '../../../../MaterialX/resources/Materials/Examples/StandardSurface/standard_surface_brick_procedural.mtlx'
+  '../../../../MaterialX/resources/Materials/Examples/StandardSurface/standard_surface_brick_procedural.mtlx',
 );
 const greysphereCalibrationFixture = path.resolve(
   sourceDir,
-  '../../../../MaterialX/resources/Materials/Examples/StandardSurface/standard_surface_greysphere_calibration.mtlx'
+  '../../../../MaterialX/resources/Materials/Examples/StandardSurface/standard_surface_greysphere_calibration.mtlx',
 );
 const marbleFixture = path.resolve(
   sourceDir,
-  '../../../../MaterialX/resources/Materials/Examples/StandardSurface/standard_surface_marble_solid.mtlx'
+  '../../../../MaterialX/resources/Materials/Examples/StandardSurface/standard_surface_marble_solid.mtlx',
 );
 const onyxFixture = path.resolve(
   sourceDir,
-  '../../../../MaterialX/resources/Materials/Examples/StandardSurface/standard_surface_onyx_hextiled.mtlx'
+  '../../../../MaterialX/resources/Materials/Examples/StandardSurface/standard_surface_onyx_hextiled.mtlx',
 );
 const copperFixture = path.resolve(
   sourceDir,
-  '../../../../MaterialX/resources/Materials/Examples/StandardSurface/standard_surface_copper.mtlx'
+  '../../../../MaterialX/resources/Materials/Examples/StandardSurface/standard_surface_copper.mtlx',
 );
-const openPbrFixture = path.resolve(sourceDir, '../../../../MaterialX/resources/Materials/Examples/OpenPbr/open_pbr_default.mtlx');
-const openPbrGlassFixture = path.resolve(sourceDir, '../../../../MaterialX/resources/Materials/Examples/OpenPbr/open_pbr_glass.mtlx');
-const openPbrKetchupFixture = path.resolve(sourceDir, '../../../../MaterialX/resources/Materials/Examples/OpenPbr/open_pbr_ketchup.mtlx');
+const openPbrFixture = path.resolve(
+  sourceDir,
+  '../../../../MaterialX/resources/Materials/Examples/OpenPbr/open_pbr_default.mtlx',
+);
+const openPbrGlassFixture = path.resolve(
+  sourceDir,
+  '../../../../MaterialX/resources/Materials/Examples/OpenPbr/open_pbr_glass.mtlx',
+);
+const openPbrKetchupFixture = path.resolve(
+  sourceDir,
+  '../../../../MaterialX/resources/Materials/Examples/OpenPbr/open_pbr_ketchup.mtlx',
+);
 const openPbrSoapBubbleFixture = path.resolve(
   sourceDir,
-  '../../../../MaterialX/resources/Materials/Examples/OpenPbr/open_pbr_soapbubble.mtlx'
+  '../../../../MaterialX/resources/Materials/Examples/OpenPbr/open_pbr_soapbubble.mtlx',
 );
 const conditionalLogicFixture = path.resolve(
   sourceDir,
-  '../../../../MaterialX/resources/Materials/TestSuite/stdlib/conditional/conditional_logic.mtlx'
+  '../../../../MaterialX/resources/Materials/TestSuite/stdlib/conditional/conditional_logic.mtlx',
 );
 const compositingFixture = path.resolve(
   sourceDir,
-  '../../../../MaterialX/resources/Materials/TestSuite/stdlib/compositing/compositing.mtlx'
+  '../../../../MaterialX/resources/Materials/TestSuite/stdlib/compositing/compositing.mtlx',
 );
-const matrixFixture = path.resolve(sourceDir, '../../../../MaterialX/resources/Materials/TestSuite/stdlib/math/matrix.mtlx');
-const vectorMathFixture = path.resolve(sourceDir, '../../../../MaterialX/resources/Materials/TestSuite/stdlib/math/vector_math.mtlx');
-const transformFixture = path.resolve(sourceDir, '../../../../MaterialX/resources/Materials/TestSuite/stdlib/math/transform.mtlx');
-const blackbodyFixture = path.resolve(sourceDir, '../../../../MaterialX/resources/Materials/TestSuite/pbrlib/bsdf/blackbody.mtlx');
-const artisticIorFixture = path.resolve(sourceDir, '../../../../MaterialX/resources/Materials/TestSuite/pbrlib/multioutput/multioutput.mtlx');
-const streamsFixture = path.resolve(sourceDir, '../../../../MaterialX/resources/Materials/TestSuite/stdlib/geometric/streams.mtlx');
-const toonShadeFixture = path.resolve(sourceDir, '../../../../MaterialX/resources/Materials/TestSuite/nprlib/toon_shade.mtlx');
-const gltfPbrDefaultFixture = path.resolve(sourceDir, '../../../../MaterialX/resources/Materials/Examples/GltfPbr/gltf_pbr_default.mtlx');
-const gltfPbrBoomBoxFixture = path.resolve(sourceDir, '../../../../MaterialX/resources/Materials/Examples/GltfPbr/gltf_pbr_boombox.mtlx');
+const matrixFixture = path.resolve(
+  sourceDir,
+  '../../../../MaterialX/resources/Materials/TestSuite/stdlib/math/matrix.mtlx',
+);
+const vectorMathFixture = path.resolve(
+  sourceDir,
+  '../../../../MaterialX/resources/Materials/TestSuite/stdlib/math/vector_math.mtlx',
+);
+const transformFixture = path.resolve(
+  sourceDir,
+  '../../../../MaterialX/resources/Materials/TestSuite/stdlib/math/transform.mtlx',
+);
+const blackbodyFixture = path.resolve(
+  sourceDir,
+  '../../../../MaterialX/resources/Materials/TestSuite/pbrlib/bsdf/blackbody.mtlx',
+);
+const artisticIorFixture = path.resolve(
+  sourceDir,
+  '../../../../MaterialX/resources/Materials/TestSuite/pbrlib/multioutput/multioutput.mtlx',
+);
+const streamsFixture = path.resolve(
+  sourceDir,
+  '../../../../MaterialX/resources/Materials/TestSuite/stdlib/geometric/streams.mtlx',
+);
+const toonShadeFixture = path.resolve(
+  sourceDir,
+  '../../../../MaterialX/resources/Materials/TestSuite/nprlib/toon_shade.mtlx',
+);
+const gltfPbrDefaultFixture = path.resolve(
+  sourceDir,
+  '../../../../MaterialX/resources/Materials/Examples/GltfPbr/gltf_pbr_default.mtlx',
+);
+const gltfPbrBoomBoxFixture = path.resolve(
+  sourceDir,
+  '../../../../MaterialX/resources/Materials/Examples/GltfPbr/gltf_pbr_boombox.mtlx',
+);
 
 const compileFixture = (fixturePath: string) => {
   const xml = readFileSync(fixturePath, 'utf8');
@@ -75,15 +111,12 @@ const readNumberLiteral = (value: unknown): number | undefined => {
   return undefined;
 };
 
-const expectCategoriesSupported = (
-  result: ReturnType<typeof compileMaterialXToTSL>,
-  categories: string[]
-) => {
+const expectCategoriesSupported = (result: ReturnType<typeof compileMaterialXToTSL>, categories: string[]) => {
   for (const category of categories) {
     expect(result.unsupportedCategories).not.toContain(category);
-    expect(
-      result.warnings.some((entry) => entry.code === 'unsupported-node' && entry.category === category)
-    ).toBe(false);
+    expect(result.warnings.some((entry) => entry.code === 'unsupported-node' && entry.category === category)).toBe(
+      false,
+    );
   }
 };
 
@@ -258,8 +291,8 @@ describe('materialx-three compiler', () => {
         (entry) =>
           entry.code === 'unsupported-node' &&
           entry.category === 'open_pbr_surface' &&
-          entry.message.includes('input "subsurface_weight"')
-      )
+          entry.message.includes('input "subsurface_weight"'),
+      ),
     ).toBe(true);
   });
 
@@ -283,16 +316,16 @@ describe('materialx-three compiler', () => {
         (entry) =>
           entry.code === 'unsupported-node' &&
           entry.category === 'standard_surface' &&
-          entry.message.includes('input "diffuse_roughness"')
-      )
+          entry.message.includes('input "diffuse_roughness"'),
+      ),
     ).toBe(true);
     expect(
       result.warnings.some(
         (entry) =>
           entry.code === 'unsupported-node' &&
           entry.category === 'standard_surface' &&
-          entry.message.includes('input "subsurface"')
-      )
+          entry.message.includes('input "subsurface"'),
+      ),
     ).toBe(true);
   });
 
@@ -322,8 +355,12 @@ describe('materialx-three compiler', () => {
     const document = parseMaterialX(xml);
     const result = compileMaterialXToTSL(document);
     expect(readNumberLiteral(result.assignments.dispersionNode)).toBeCloseTo(0.2, 6);
-    expect(result.warnings.some((entry) => entry.message.includes('input "transmission_dispersion_scale"'))).toBe(false);
-    expect(result.warnings.some((entry) => entry.message.includes('input "transmission_dispersion_abbe_number"'))).toBe(false);
+    expect(result.warnings.some((entry) => entry.message.includes('input "transmission_dispersion_scale"'))).toBe(
+      false,
+    );
+    expect(result.warnings.some((entry) => entry.message.includes('input "transmission_dispersion_abbe_number"'))).toBe(
+      false,
+    );
 
     const compiled = createThreeMaterialFromDocument(document);
     expect(readNumberLiteral(compiled.material.dispersionNode)).toBeCloseTo(0.2, 6);
@@ -354,7 +391,7 @@ describe('materialx-three compiler', () => {
     expect(result.assignments.thicknessNode).toBeDefined();
     expect(result.assignments.iorNode).toBeDefined();
     expect(
-      result.warnings.some((entry) => entry.code === 'unsupported-node' && entry.nodeName === result.surfaceShaderName)
+      result.warnings.some((entry) => entry.code === 'unsupported-node' && entry.nodeName === result.surfaceShaderName),
     ).toBe(false);
     expectCategoriesSupported(result, ['gltf_pbr']);
 
@@ -383,9 +420,9 @@ describe('materialx-three compiler', () => {
     const document = parseMaterialX(xml);
     const result = compileMaterialXToTSL(document);
     expect(result.assignments.dispersionNode).toBeDefined();
-    expect(result.warnings.some((entry) => entry.code === 'unsupported-node' && entry.message.includes('dispersion'))).toBe(
-      false
-    );
+    expect(
+      result.warnings.some((entry) => entry.code === 'unsupported-node' && entry.message.includes('dispersion')),
+    ).toBe(false);
 
     const compiled = createThreeMaterialFromDocument(document);
     expect(compiled.material.dispersionNode).toBeDefined();
@@ -475,13 +512,7 @@ describe('materialx-three compiler', () => {
 
   it('supports broad gltf_* texture node coverage used by boombox fixture', () => {
     const result = compileFixture(gltfPbrBoomBoxFixture);
-    expectCategoriesSupported(result, [
-      'gltf_pbr',
-      'gltf_colorimage',
-      'gltf_image',
-      'gltf_normalmap',
-      'separate3',
-    ]);
+    expectCategoriesSupported(result, ['gltf_pbr', 'gltf_colorimage', 'gltf_image', 'gltf_normalmap', 'separate3']);
     expect(result.assignments.colorNode).toBeDefined();
     expect(result.assignments.metalnessNode).toBeDefined();
     expect(result.assignments.roughnessNode).toBeDefined();
@@ -742,7 +773,12 @@ describe('materialx-three compiler', () => {
     expectCategoriesSupported(vectorMathResult, ['transpose', 'determinant']);
 
     const transformResult = compileFixture(transformFixture);
-    expectCategoriesSupported(transformResult, ['transformpoint', 'transformvector', 'transformnormal', 'transformmatrix']);
+    expectCategoriesSupported(transformResult, [
+      'transformpoint',
+      'transformvector',
+      'transformnormal',
+      'transformmatrix',
+    ]);
   });
 
   it('supports geometric and pbr helper categories in upstream fixtures', () => {

@@ -8,7 +8,12 @@ import type { MaterialXThreeCompileOptions, MaterialXThreeCompileResult, Materia
 import { resolveInputNode } from './compile-node.js';
 import type { CompileContext } from './internal-types.js';
 import { readInput } from './inputs.js';
-import { getCoveredCategories, warnGltfPbrLimitations, warnOpenPbrLimitations, warnStandardSurfaceLimitations } from './warnings.js';
+import {
+  getCoveredCategories,
+  warnGltfPbrLimitations,
+  warnOpenPbrLimitations,
+  warnStandardSurfaceLimitations,
+} from './warnings.js';
 
 const findMaterialNode = (document: MaterialXDocument, materialName?: string): MaterialXNode | undefined => {
   const materials = document.nodes.filter((node) => node.category === 'surfacematerial');
@@ -23,7 +28,7 @@ const findMaterialNode = (document: MaterialXDocument, materialName?: string): M
 
 const resolveSurfaceShaderNode = (
   materialNode: MaterialXNode,
-  context: CompileContext
+  context: CompileContext,
 ): { node: MaterialXNode; scopeGraph?: MaterialXNodeGraph } | undefined => {
   const surfaceInput = readInput(materialNode, 'surfaceshader');
   if (!surfaceInput) {
@@ -41,7 +46,7 @@ const resolveSurfaceShaderNode = (
 
 export const compileMaterialXToTSL = (
   document: MaterialXDocument,
-  options: MaterialXThreeCompileOptions = {}
+  options: MaterialXThreeCompileOptions = {},
 ): MaterialXThreeCompileResult => {
   const warnings: MaterialXThreeWarning[] = [];
   const context: CompileContext = {

@@ -236,4 +236,3 @@ Generated from `@materialx-js/materialx` node registry.
 - `uniform_edf`
 - `volume`
 - `volumematerial`
-

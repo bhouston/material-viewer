@@ -11,7 +11,8 @@ const allCategories = [...new Set(materialXNodeRegistry.map((entry) => entry.cat
 const supported = allCategories.filter((entry) => supportedNodeCategories.has(entry));
 const unsupported = allCategories.filter((entry) => !supportedNodeCategories.has(entry));
 
-const toBullets = (entries: string[]): string => (entries.length === 0 ? '- (none)\n' : `${entries.map((entry) => `- \`${entry}\``).join('\n')}\n`);
+const toBullets = (entries: string[]): string =>
+  entries.length === 0 ? '- (none)\n' : `${entries.map((entry) => `- \`${entry}\``).join('\n')}\n`;
 
 const markdown = `# materialx-three Node Coverage
 

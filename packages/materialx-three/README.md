@@ -59,20 +59,20 @@ pnpm --filter @materialx-js/materialx-three dev
 ## Basic Usage
 
 ```ts
-import { parseMaterialX } from '@materialx-js/materialx'
+import { parseMaterialX } from '@materialx-js/materialx';
 import {
   compileMaterialXToTSL,
   createThreeMaterialFromDocument,
   createTextureResolver,
-} from '@materialx-js/materialx-three'
+} from '@materialx-js/materialx-three';
 
-const document = parseMaterialX(xmlString)
+const document = parseMaterialX(xmlString);
 
 const compileResult = compileMaterialXToTSL(document, {
   textureResolver: createTextureResolver({ basePath: '/assets/materials' }),
-})
+});
 
-const { material, result } = createThreeMaterialFromDocument(document)
+const { material, result } = createThreeMaterialFromDocument(document);
 ```
 
 ### Main Exports

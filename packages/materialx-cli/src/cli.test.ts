@@ -12,10 +12,7 @@ const sourceDir = path.dirname(fileURLToPath(import.meta.url));
 const cliDir = path.resolve(sourceDir, '..');
 const repoRoot = path.resolve(cliDir, '../..');
 const materialXRoot = path.resolve(repoRoot, '../MaterialX');
-const fixturePath = path.join(
-  materialXRoot,
-  'resources/Materials/Examples/OpenPbr/open_pbr_default.mtlx',
-);
+const fixturePath = path.join(materialXRoot, 'resources/Materials/Examples/OpenPbr/open_pbr_default.mtlx');
 
 extendMatchers();
 

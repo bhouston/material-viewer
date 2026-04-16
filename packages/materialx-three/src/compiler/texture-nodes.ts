@@ -9,7 +9,7 @@ type ResolveInputNode = (
   inputName: string,
   fallback: unknown,
   context: CompileContext,
-  scopeGraph?: MaterialXNodeGraph
+  scopeGraph?: MaterialXNodeGraph,
 ) => unknown;
 
 type ReadInput = (node: MaterialXNode, name: string) => MaterialXNode['inputs'][number] | undefined;
@@ -41,7 +41,11 @@ const selectTextureSample = (sample: unknown, typeName?: string): unknown => {
 };
 
 export const createTextureNodeCompiler = ({ resolveInputNode, readInput, warn, toScalar }: TextureNodeCompilerDeps) => {
-  const compileTextureNode = (node: MaterialXNode, context: CompileContext, scopeGraph?: MaterialXNodeGraph): unknown => {
+  const compileTextureNode = (
+    node: MaterialXNode,
+    context: CompileContext,
+    scopeGraph?: MaterialXNodeGraph,
+  ): unknown => {
     const fileInput = readInput(node, 'file');
     const uri = fileInput?.value ?? fileInput?.attributes.value;
     if (!uri) {
@@ -57,16 +61,22 @@ export const createTextureNodeCompiler = ({ resolveInputNode, readInput, warn, t
     const uvNode = resolveInputNode(node, 'texcoord', uv(0), context, scopeGraph);
     const uvTiling = resolveInputNode(node, 'uvtiling', vec2(1, 1), context, scopeGraph);
     const uvOffset = resolveInputNode(node, 'uvoffset', vec2(0, 0), context, scopeGraph);
-    const transformedUv = node.category === 'tiledimage' ? add(mul(uvNode as never, uvTiling as never), uvOffset as never) : uvNode;
+    const transformedUv =
+      node.category === 'tiledimage' ? add(mul(uvNode as never, uvTiling as never), uvOffset as never) : uvNode;
 
-    const textureResolver = context.options.textureResolver ?? createTextureResolver({ basePath: context.options.basePath });
+    const textureResolver =
+      context.options.textureResolver ?? createTextureResolver({ basePath: context.options.basePath });
     const tex = textureResolver.resolve(uri, { document: context.document, node });
     const sampled = texture(tex, transformedUv as never);
     const colorCorrected = applyTextureColorSpace(context.document.attributes.colorspace, sampled);
     return selectTextureSample(colorCorrected, node.type);
   };
 
-  const compileGltfTextureSample = (node: MaterialXNode, context: CompileContext, scopeGraph?: MaterialXNodeGraph): unknown => {
+  const compileGltfTextureSample = (
+    node: MaterialXNode,
+    context: CompileContext,
+    scopeGraph?: MaterialXNodeGraph,
+  ): unknown => {
     const fileInput = readInput(node, 'file');
     const uri = fileInput?.value ?? fileInput?.attributes.value;
     if (!uri) {
@@ -99,10 +109,11 @@ export const createTextureNodeCompiler = ({ resolveInputNode, readInput, warn, t
       pivot as never,
       scaleNode as never,
       rotate as never,
-      offset as never
+      offset as never,
     );
 
-    const textureResolver = context.options.textureResolver ?? createTextureResolver({ basePath: context.options.basePath });
+    const textureResolver =
+      context.options.textureResolver ?? createTextureResolver({ basePath: context.options.basePath });
     const tex = textureResolver.resolve(uri, { document: context.document, node });
     return texture(tex, transformedUv as never);
   };
@@ -110,7 +121,7 @@ export const createTextureNodeCompiler = ({ resolveInputNode, readInput, warn, t
   const compileGltfImageNode = (
     node: MaterialXNode,
     context: CompileContext,
-    scopeGraph: MaterialXNodeGraph | undefined
+    scopeGraph: MaterialXNodeGraph | undefined,
   ): unknown => {
     const sampled = compileGltfTextureSample(node, context, scopeGraph);
     const colorCorrected = applyTextureColorSpace(context.document.attributes.colorspace, sampled);
@@ -123,7 +134,11 @@ export const createTextureNodeCompiler = ({ resolveInputNode, readInput, warn, t
     return sampledValue;
   };
 
-  const compileHexTiledTextureNode = (node: MaterialXNode, context: CompileContext, scopeGraph?: MaterialXNodeGraph): unknown => {
+  const compileHexTiledTextureNode = (
+    node: MaterialXNode,
+    context: CompileContext,
+    scopeGraph?: MaterialXNodeGraph,
+  ): unknown => {
     const fileInput = readInput(node, 'file');
     const uri = fileInput?.value ?? fileInput?.attributes.value;
     if (!uri) {
@@ -140,7 +155,8 @@ export const createTextureNodeCompiler = ({ resolveInputNode, readInput, warn, t
     const tiling = resolveInputNode(node, 'tiling', vec2(1, 1), context, scopeGraph);
     const transformedUv = mul(uvNode as never, tiling as never);
 
-    const textureResolver = context.options.textureResolver ?? createTextureResolver({ basePath: context.options.basePath });
+    const textureResolver =
+      context.options.textureResolver ?? createTextureResolver({ basePath: context.options.basePath });
     const tex = textureResolver.resolve(uri, { document: context.document, node });
     const sampled = texture(tex, transformedUv as never);
     const colorCorrected = applyTextureColorSpace(context.document.attributes.colorspace, sampled);

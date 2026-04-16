@@ -6,7 +6,7 @@ type ResolveInputNode = (
   inputName: string,
   fallback: unknown,
   context: CompileContext,
-  scopeGraph?: MaterialXNodeGraph
+  scopeGraph?: MaterialXNodeGraph,
 ) => unknown;
 
 export const compileBinaryMath = (
@@ -16,7 +16,7 @@ export const compileBinaryMath = (
   rightName: string,
   context: CompileContext,
   scopeGraph: MaterialXNodeGraph | undefined,
-  operator: (left: unknown, right: unknown) => unknown
+  operator: (left: unknown, right: unknown) => unknown,
 ): unknown => {
   const left = resolveInputNode(node, leftName, 0, context, scopeGraph);
   const right = resolveInputNode(node, rightName, 0, context, scopeGraph);

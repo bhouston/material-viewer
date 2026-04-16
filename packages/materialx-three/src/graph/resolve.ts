@@ -1,4 +1,10 @@
-import type { MaterialXDocument, MaterialXInput, MaterialXNode, MaterialXNodeGraph, MaterialXOutput } from '@materialx-js/materialx';
+import type {
+  MaterialXDocument,
+  MaterialXInput,
+  MaterialXNode,
+  MaterialXNodeGraph,
+  MaterialXOutput,
+} from '@materialx-js/materialx';
 
 export interface GraphReference {
   sourceNode: MaterialXNode;
@@ -52,7 +58,7 @@ const resolveNodeGraphOutput = (nodeGraph: MaterialXNodeGraph, outputName?: stri
 const resolveNodeInScope = (
   input: MaterialXInput,
   scopeGraph: MaterialXNodeGraph | undefined,
-  index: GraphIndex
+  index: GraphIndex,
 ): GraphReference | undefined => {
   const referencedName = input.nodeName ?? input.attributes.nodename;
   if (!referencedName) {
@@ -77,7 +83,7 @@ const resolveNodeInScope = (
 export const resolveInputReference = (
   input: MaterialXInput,
   scopeGraph: MaterialXNodeGraph | undefined,
-  index: GraphIndex
+  index: GraphIndex,
 ): GraphReference | undefined => {
   const scopedNodeReference = resolveNodeInScope(input, scopeGraph, index);
   if (scopedNodeReference) {
@@ -120,7 +126,7 @@ const visitNode = (
   index: GraphIndex,
   active: Set<string>,
   visited: Set<string>,
-  order: MaterialXNode[]
+  order: MaterialXNode[],
 ): void => {
   const key = `${scopeGraph?.name ?? 'document'}:${nodeName(node)}`;
   if (visited.has(key)) {
@@ -147,7 +153,7 @@ const visitNode = (
 export const topologicallySortFromNode = (
   node: MaterialXNode,
   scopeGraph: MaterialXNodeGraph | undefined,
-  index: GraphIndex
+  index: GraphIndex,
 ): MaterialXNode[] => {
   const visited = new Set<string>();
   const active = new Set<string>();

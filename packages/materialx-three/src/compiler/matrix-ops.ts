@@ -67,7 +67,8 @@ const dotRow = (row: unknown[], vector: unknown[]): unknown => {
   return sum;
 };
 
-const multiplyMatrixVector = (matrix: MatrixValue, vector: unknown[]): unknown[] => matrix.values.map((row) => dotRow(row, vector));
+const multiplyMatrixVector = (matrix: MatrixValue, vector: unknown[]): unknown[] =>
+  matrix.values.map((row) => dotRow(row, vector));
 
 export const transposeMatrix = (matrix: MatrixValue): MatrixValue => {
   const size = matrix.kind === 'matrix33' ? 3 : 4;
@@ -105,7 +106,7 @@ export const det3 = (matrix: unknown[][]): unknown => {
 
   return add(
     sub(mul(a as never, eiMinusFh as never) as never, mul(b as never, diMinusFg as never) as never) as never,
-    mul(c as never, dhMinusEg as never) as never
+    mul(c as never, dhMinusEg as never) as never,
   );
 };
 
@@ -170,9 +171,21 @@ const invertMatrix3 = (matrix: MatrixValue): MatrixValue => {
   return {
     kind: 'matrix33',
     values: [
-      [mul(cofactor00 as never, invDet as never), mul(cofactor10 as never, invDet as never), mul(cofactor20 as never, invDet as never)],
-      [mul(cofactor01 as never, invDet as never), mul(cofactor11 as never, invDet as never), mul(cofactor21 as never, invDet as never)],
-      [mul(cofactor02 as never, invDet as never), mul(cofactor12 as never, invDet as never), mul(cofactor22 as never, invDet as never)],
+      [
+        mul(cofactor00 as never, invDet as never),
+        mul(cofactor10 as never, invDet as never),
+        mul(cofactor20 as never, invDet as never),
+      ],
+      [
+        mul(cofactor01 as never, invDet as never),
+        mul(cofactor11 as never, invDet as never),
+        mul(cofactor21 as never, invDet as never),
+      ],
+      [
+        mul(cofactor02 as never, invDet as never),
+        mul(cofactor12 as never, invDet as never),
+        mul(cofactor22 as never, invDet as never),
+      ],
     ],
   };
 };
@@ -215,7 +228,7 @@ export const invertMatrix = (matrix: MatrixValue): MatrixValue =>
 export const applyMatrixTransform = (
   inputValue: unknown,
   matrixValue: unknown,
-  variant: 'vector2M3' | 'vector3' | 'vector3M4' | 'vector4'
+  variant: 'vector2M3' | 'vector3' | 'vector3M4' | 'vector4',
 ): unknown => {
   if (variant === 'vector2M3') {
     const matrix = asMatrixValue(matrixValue, 'matrix33');

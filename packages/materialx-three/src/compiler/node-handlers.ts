@@ -91,7 +91,7 @@ export type ResolveInputNodeFn = (
   inputName: string,
   fallback: unknown,
   context: CompileContext,
-  scopeGraph?: MaterialXNodeGraph
+  scopeGraph?: MaterialXNodeGraph,
 ) => unknown;
 
 export interface NodeHandlerDeps {
@@ -99,7 +99,11 @@ export interface NodeHandlerDeps {
   compileTextureNode: (node: MaterialXNode, context: CompileContext, scopeGraph?: MaterialXNodeGraph) => unknown;
   compileGltfTextureSample: (node: MaterialXNode, context: CompileContext, scopeGraph?: MaterialXNodeGraph) => unknown;
   compileGltfImageNode: (node: MaterialXNode, context: CompileContext, scopeGraph?: MaterialXNodeGraph) => unknown;
-  compileHexTiledTextureNode: (node: MaterialXNode, context: CompileContext, scopeGraph?: MaterialXNodeGraph) => unknown;
+  compileHexTiledTextureNode: (
+    node: MaterialXNode,
+    context: CompileContext,
+    scopeGraph?: MaterialXNodeGraph,
+  ) => unknown;
 }
 
 const register = (map: Map<string, NodeHandler>, keys: readonly string[], handler: NodeHandler): void => {
@@ -109,17 +113,18 @@ const register = (map: Map<string, NodeHandler>, keys: readonly string[], handle
 };
 
 const bin =
-  (
-    deps: NodeHandlerDeps,
-    left: string,
-    right: string,
-    op: (a: unknown, b: unknown) => unknown
-  ): NodeHandler =>
+  (deps: NodeHandlerDeps, left: string, right: string, op: (a: unknown, b: unknown) => unknown): NodeHandler =>
   (node, context, scopeGraph) =>
     compileBinaryMath(deps.resolveInputNode, node, left, right, context, scopeGraph, op);
 
 export const buildNodeHandlerRegistry = (deps: NodeHandlerDeps): Map<string, NodeHandler> => {
-  const { resolveInputNode, compileTextureNode, compileGltfTextureSample, compileGltfImageNode, compileHexTiledTextureNode } = deps;
+  const {
+    resolveInputNode,
+    compileTextureNode,
+    compileGltfTextureSample,
+    compileGltfImageNode,
+    compileHexTiledTextureNode,
+  } = deps;
   const r = resolveInputNode;
   const map = new Map<string, NodeHandler>();
 
@@ -151,7 +156,10 @@ export const buildNodeHandlerRegistry = (deps: NodeHandlerDeps): Map<string, Nod
     const sampledThickness = (sampled as { x?: unknown }).x ?? sampled;
     const thicknessMin = r(node, 'thicknessMin', 100, context, scopeGraph);
     const thicknessMax = r(node, 'thicknessMax', 400, context, scopeGraph);
-    return add(thicknessMin as never, mul(sampledThickness as never, sub(thicknessMax as never, thicknessMin as never) as never));
+    return add(
+      thicknessMin as never,
+      mul(sampledThickness as never, sub(thicknessMax as never, thicknessMin as never) as never),
+    );
   });
 
   map.set('gltf_anisotropy_image', (node, context, scopeGraph, outputName) => {
@@ -209,10 +217,22 @@ export const buildNodeHandlerRegistry = (deps: NodeHandlerDeps): Map<string, Nod
     return float(inNode as never);
   });
 
-  map.set('add', bin(deps, 'in1', 'in2', (left, right) => add(left as never, right as never)));
-  map.set('subtract', bin(deps, 'in1', 'in2', (left, right) => sub(left as never, right as never)));
-  map.set('multiply', bin(deps, 'in1', 'in2', (left, right) => mul(left as never, right as never)));
-  map.set('divide', bin(deps, 'in1', 'in2', (left, right) => div(left as never, right as never)));
+  map.set(
+    'add',
+    bin(deps, 'in1', 'in2', (left, right) => add(left as never, right as never)),
+  );
+  map.set(
+    'subtract',
+    bin(deps, 'in1', 'in2', (left, right) => sub(left as never, right as never)),
+  );
+  map.set(
+    'multiply',
+    bin(deps, 'in1', 'in2', (left, right) => mul(left as never, right as never)),
+  );
+  map.set(
+    'divide',
+    bin(deps, 'in1', 'in2', (left, right) => div(left as never, right as never)),
+  );
 
   map.set('clamp', (node, context, scopeGraph) => {
     const inNode = r(node, 'in', 0, context, scopeGraph);
@@ -221,8 +241,14 @@ export const buildNodeHandlerRegistry = (deps: NodeHandlerDeps): Map<string, Nod
     return clamp(inNode as never, low as never, high as never);
   });
 
-  map.set('min', bin(deps, 'in1', 'in2', (left, right) => min(left as never, right as never)));
-  map.set('max', bin(deps, 'in1', 'in2', (left, right) => max(left as never, right as never)));
+  map.set(
+    'min',
+    bin(deps, 'in1', 'in2', (left, right) => min(left as never, right as never)),
+  );
+  map.set(
+    'max',
+    bin(deps, 'in1', 'in2', (left, right) => max(left as never, right as never)),
+  );
 
   map.set('mix', (node, context, scopeGraph) => {
     const fg = r(node, 'fg', 1, context, scopeGraph);
@@ -254,7 +280,10 @@ export const buildNodeHandlerRegistry = (deps: NodeHandlerDeps): Map<string, Nod
     const bg = r(node, 'bg', 0, context, scopeGraph);
     const mixAmount = r(node, 'mix', 1, context, scopeGraph);
     const minusOut = sub(bg as never, fg as never);
-    return add(mul(mixAmount as never, minusOut as never) as never, mul(sub(float(1), mixAmount as never) as never, bg as never) as never);
+    return add(
+      mul(mixAmount as never, minusOut as never) as never,
+      mul(sub(float(1), mixAmount as never) as never, bg as never) as never,
+    );
   });
 
   map.set('difference', (node, context, scopeGraph) => {
@@ -264,7 +293,7 @@ export const buildNodeHandlerRegistry = (deps: NodeHandlerDeps): Map<string, Nod
     const differenceOut = abs(sub(bg as never, fg as never) as never);
     return add(
       mul(mixAmount as never, differenceOut as never) as never,
-      mul(sub(float(1), mixAmount as never) as never, bg as never) as never
+      mul(sub(float(1), mixAmount as never) as never, bg as never) as never,
     );
   });
 
@@ -275,7 +304,10 @@ export const buildNodeHandlerRegistry = (deps: NodeHandlerDeps): Map<string, Nod
     const epsilon = float(1e-6);
     const safeFg = max(fg as never, epsilon);
     const burned = sub(float(1), div(sub(float(1), bg as never) as never, safeFg as never));
-    return add(mul(mixAmount as never, burned as never) as never, mul(sub(float(1), mixAmount as never) as never, bg as never) as never);
+    return add(
+      mul(mixAmount as never, burned as never) as never,
+      mul(sub(float(1), mixAmount as never) as never, bg as never) as never,
+    );
   });
 
   map.set('dodge', (node, context, scopeGraph) => {
@@ -285,7 +317,10 @@ export const buildNodeHandlerRegistry = (deps: NodeHandlerDeps): Map<string, Nod
     const epsilon = float(1e-6);
     const safeDivisor = max(sub(float(1), fg as never) as never, epsilon);
     const dodged = div(bg as never, safeDivisor as never);
-    return add(mul(mixAmount as never, dodged as never) as never, mul(sub(float(1), mixAmount as never) as never, bg as never) as never);
+    return add(
+      mul(mixAmount as never, dodged as never) as never,
+      mul(sub(float(1), mixAmount as never) as never, bg as never) as never,
+    );
   });
 
   map.set('unpremult', (node, context, scopeGraph) => {
@@ -299,9 +334,14 @@ export const buildNodeHandlerRegistry = (deps: NodeHandlerDeps): Map<string, Nod
         div(getNodeChannel(inNode, 1) as never, safeAlpha as never),
         div(getNodeChannel(inNode, 2) as never, safeAlpha as never),
       ],
-      3
+      3,
     );
-    return vec4(getNodeChannel(rgb, 0) as never, getNodeChannel(rgb, 1) as never, getNodeChannel(rgb, 2) as never, alpha as never);
+    return vec4(
+      getNodeChannel(rgb, 0) as never,
+      getNodeChannel(rgb, 1) as never,
+      getNodeChannel(rgb, 2) as never,
+      alpha as never,
+    );
   });
 
   map.set('screen', (node, context, scopeGraph) => {
@@ -319,7 +359,7 @@ export const buildNodeHandlerRegistry = (deps: NodeHandlerDeps): Map<string, Nod
     const lowBranch = mul(mul(float(2), fg as never) as never, bg as never);
     const highBranch = sub(
       float(1),
-      mul(mul(float(2), sub(float(1), fg as never) as never) as never, sub(float(1), bg as never) as never)
+      mul(mul(float(2), sub(float(1), fg as never) as never) as never, sub(float(1), bg as never) as never),
     );
     const overlayed = mix(lowBranch as never, highBranch as never, step(float(0.5), bg as never) as never);
     return mix(bg as never, overlayed as never, mixAmount as never);
@@ -346,7 +386,11 @@ export const buildNodeHandlerRegistry = (deps: NodeHandlerDeps): Map<string, Nod
     return mx_ifgreater(distanceSquared as never, radiusSquared as never, float(0) as never, float(1) as never);
   });
 
-  register(map, ['dot', 'dotproduct'], bin(deps, 'in1', 'in2', (left, right) => dot(left as never, right as never)));
+  register(
+    map,
+    ['dot', 'dotproduct'],
+    bin(deps, 'in1', 'in2', (left, right) => dot(left as never, right as never)),
+  );
 
   map.set('magnitude', (node, context, scopeGraph) => {
     const inNode = r(node, 'in', vec3(0, 0, 0), context, scopeGraph);
@@ -358,7 +402,10 @@ export const buildNodeHandlerRegistry = (deps: NodeHandlerDeps): Map<string, Nod
     return normalize(inNode as never);
   });
 
-  map.set('modulo', bin(deps, 'in1', 'in2', (left, right) => mod(left as never, right as never)));
+  map.set(
+    'modulo',
+    bin(deps, 'in1', 'in2', (left, right) => mod(left as never, right as never)),
+  );
 
   map.set('absval', (node, context, scopeGraph) => abs(r(node, 'in', 0, context, scopeGraph) as never));
   map.set('sign', (node, context, scopeGraph) => sign(r(node, 'in', 0, context, scopeGraph) as never));
@@ -381,10 +428,22 @@ export const buildNodeHandlerRegistry = (deps: NodeHandlerDeps): Map<string, Nod
     return atan2(inY as never, inX as never);
   });
 
-  map.set('power', bin(deps, 'in1', 'in2', (left, right) => pow(left as never, right as never)));
-  map.set('safepower', bin(deps, 'in1', 'in2', (left, right) => mx_safepower(left as never, right as never)));
-  map.set('distance', bin(deps, 'in1', 'in2', (left, right) => distance(left as never, right as never)));
-  map.set('crossproduct', bin(deps, 'in1', 'in2', (left, right) => cross(left as never, right as never)));
+  map.set(
+    'power',
+    bin(deps, 'in1', 'in2', (left, right) => pow(left as never, right as never)),
+  );
+  map.set(
+    'safepower',
+    bin(deps, 'in1', 'in2', (left, right) => mx_safepower(left as never, right as never)),
+  );
+  map.set(
+    'distance',
+    bin(deps, 'in1', 'in2', (left, right) => distance(left as never, right as never)),
+  );
+  map.set(
+    'crossproduct',
+    bin(deps, 'in1', 'in2', (left, right) => cross(left as never, right as never)),
+  );
 
   map.set('invert', (node, context, scopeGraph) => {
     const inNode = r(node, 'in', 0, context, scopeGraph);
@@ -399,7 +458,9 @@ export const buildNodeHandlerRegistry = (deps: NodeHandlerDeps): Map<string, Nod
     return smoothstep(low as never, high as never, inNode as never);
   });
 
-  map.set('saturate', (node, context, scopeGraph) => clamp(r(node, 'in', 0, context, scopeGraph) as never, float(0), float(1)));
+  map.set('saturate', (node, context, scopeGraph) =>
+    clamp(r(node, 'in', 0, context, scopeGraph) as never, float(0), float(1)),
+  );
 
   map.set('remap', (node, context, scopeGraph) => {
     const inNode = r(node, 'in', 0, context, scopeGraph);
@@ -423,7 +484,10 @@ export const buildNodeHandlerRegistry = (deps: NodeHandlerDeps): Map<string, Nod
     const doClamp = r(node, 'doclamp', false, context, scopeGraph);
     const remapped = div(sub(inNode as never, inLow as never), sub(inHigh as never, inLow as never));
     const reciprocalGamma = div(float(1), gamma as never);
-    const gammaCorrected = mul(pow(abs(remapped as never) as never, reciprocalGamma as never), sign(remapped as never) as never);
+    const gammaCorrected = mul(
+      pow(abs(remapped as never) as never, reciprocalGamma as never),
+      sign(remapped as never) as never,
+    );
     const scaled = add(outLow as never, mul(gammaCorrected as never, sub(outHigh as never, outLow as never) as never));
     const clamped = clamp(scaled as never, outLow as never, outHigh as never);
     return mx_ifequal(doClamp as never, float(1) as never, clamped as never, scaled as never);
@@ -506,7 +570,7 @@ export const buildNodeHandlerRegistry = (deps: NodeHandlerDeps): Map<string, Nod
       'in',
       matrixIdentity(node.type === 'matrix33' ? 'matrix33' : 'matrix44'),
       context,
-      scopeGraph
+      scopeGraph,
     );
     const matrix = asMatrixValue(inMatrix, node.type === 'matrix33' ? 'matrix33' : 'matrix44');
     return transposeMatrix(matrix);
@@ -519,7 +583,7 @@ export const buildNodeHandlerRegistry = (deps: NodeHandlerDeps): Map<string, Nod
       'in',
       matrixIdentity(nodeDefName?.includes('matrix33') ? 'matrix33' : 'matrix44'),
       context,
-      scopeGraph
+      scopeGraph,
     );
     const matrix = asMatrixValue(inMatrix, nodeDefName?.includes('matrix33') ? 'matrix33' : 'matrix44');
     return matrix.kind === 'matrix33' ? det3(matrix.values) : det4(matrix.values);
@@ -568,7 +632,7 @@ export const buildNodeHandlerRegistry = (deps: NodeHandlerDeps): Map<string, Nod
   });
 
   register(map, ['transformpoint', 'transformvector', 'transformnormal'], (node, context, scopeGraph) =>
-    r(node, 'in', vec3(0, 0, 0), context, scopeGraph)
+    r(node, 'in', vec3(0, 0, 0), context, scopeGraph),
   );
 
   map.set('rotate2d', (node, context, scopeGraph) => {
@@ -669,7 +733,13 @@ export const buildNodeHandlerRegistry = (deps: NodeHandlerDeps): Map<string, Nod
     const lacunarity = r(node, 'lacunarity', 2, context, scopeGraph);
     const diminish = r(node, 'diminish', 0.5, context, scopeGraph);
     const amplitude = r(node, 'amplitude', 1, context, scopeGraph);
-    return mx_fractal_noise_float(position as never, octaves as never, lacunarity as never, diminish as never, amplitude as never);
+    return mx_fractal_noise_float(
+      position as never,
+      octaves as never,
+      lacunarity as never,
+      diminish as never,
+      amplitude as never,
+    );
   });
 
   register(map, ['cellnoise2d', 'cellnoise3d'], (node, context, scopeGraph) => {
@@ -706,7 +776,7 @@ export const buildNodeHandlerRegistry = (deps: NodeHandlerDeps): Map<string, Nod
       clampOutput as never,
       octaves as never,
       lacunarity as never,
-      diminish as never
+      diminish as never,
     );
   });
 
@@ -733,7 +803,7 @@ export const buildNodeHandlerRegistry = (deps: NodeHandlerDeps): Map<string, Nod
       clampOutput as never,
       octaves as never,
       lacunarity as never,
-      diminish as never
+      diminish as never,
     );
   });
 
@@ -745,11 +815,15 @@ export const buildNodeHandlerRegistry = (deps: NodeHandlerDeps): Map<string, Nod
     return normalMap(normalSample as never, scaleNode as never);
   });
 
-  map.set('hsvtorgb', (node, context, scopeGraph) => mx_hsvtorgb(r(node, 'in', vec3(0, 0, 0), context, scopeGraph) as never));
-  map.set('rgbtohsv', (node, context, scopeGraph) => mx_rgbtohsv(r(node, 'in', vec3(0, 0, 0), context, scopeGraph) as never));
+  map.set('hsvtorgb', (node, context, scopeGraph) =>
+    mx_hsvtorgb(r(node, 'in', vec3(0, 0, 0), context, scopeGraph) as never),
+  );
+  map.set('rgbtohsv', (node, context, scopeGraph) =>
+    mx_rgbtohsv(r(node, 'in', vec3(0, 0, 0), context, scopeGraph) as never),
+  );
 
   map.set('luminance', (node, context, scopeGraph) =>
-    luminance(r(node, 'in', vec3(0, 0, 0), context, scopeGraph) as never, vec3(0.2126, 0.7152, 0.0722))
+    luminance(r(node, 'in', vec3(0, 0, 0), context, scopeGraph) as never, vec3(0.2126, 0.7152, 0.0722)),
   );
 
   map.set('contrast', (node, context, scopeGraph) => {
@@ -770,21 +844,28 @@ export const buildNodeHandlerRegistry = (deps: NodeHandlerDeps): Map<string, Nod
     const exposure = r(node, 'exposure', 0, context, scopeGraph);
     const rgbInput =
       node.type === 'color4'
-        ? vec3(getNodeChannel(inNode, 0) as never, getNodeChannel(inNode, 1) as never, getNodeChannel(inNode, 2) as never)
+        ? vec3(
+            getNodeChannel(inNode, 0) as never,
+            getNodeChannel(inNode, 1) as never,
+            getNodeChannel(inNode, 2) as never,
+          )
         : inNode;
     const hsv = mx_rgbtohsv(rgbInput as never);
     const hueAdjusted = vec3(
       add(getNodeChannel(hsv, 0) as never, hue as never) as never,
       mul(getNodeChannel(hsv, 1) as never, saturation as never) as never,
-      getNodeChannel(hsv, 2) as never
+      getNodeChannel(hsv, 2) as never,
     );
     const saturationAdjusted = mx_hsvtorgb(hueAdjusted as never);
     const reciprocalGamma = div(float(1), gamma as never);
     const gammaCorrected = mul(
       pow(abs(saturationAdjusted as never) as never, reciprocalGamma as never) as never,
-      sign(saturationAdjusted as never) as never
+      sign(saturationAdjusted as never) as never,
     );
-    const liftApplied = add(mul(gammaCorrected as never, sub(float(1), lift as never) as never) as never, lift as never);
+    const liftApplied = add(
+      mul(gammaCorrected as never, sub(float(1), lift as never) as never) as never,
+      lift as never,
+    );
     const gainApplied = mul(liftApplied as never, gain as never);
     const contrastApplied = mx_contrast(gainApplied as never, contrastAmount as never, contrastPivot as never);
     const exposureScale = pow(float(2), exposure as never);
@@ -794,7 +875,7 @@ export const buildNodeHandlerRegistry = (deps: NodeHandlerDeps): Map<string, Nod
           getNodeChannel(colorOut, 0) as never,
           getNodeChannel(colorOut, 1) as never,
           getNodeChannel(colorOut, 2) as never,
-          getNodeChannel(inNode, 3) as never
+          getNodeChannel(inNode, 3) as never,
         )
       : colorOut;
   });
@@ -806,26 +887,26 @@ export const buildNodeHandlerRegistry = (deps: NodeHandlerDeps): Map<string, Nod
     const t3 = mul(t2 as never, t as never);
     const lowX = add(
       add(mul(float(-0.2661239), t3 as never) as never, mul(float(-0.234358), t2 as never) as never) as never,
-      add(mul(float(0.8776956), t as never) as never, float(0.17991)) as never
+      add(mul(float(0.8776956), t as never) as never, float(0.17991)) as never,
     );
     const highX = add(
       add(mul(float(-3.0258469), t3 as never) as never, mul(float(2.1070379), t2 as never) as never) as never,
-      add(mul(float(0.2226347), t as never) as never, float(0.24039)) as never
+      add(mul(float(0.2226347), t as never) as never, float(0.24039)) as never,
     );
     const xc = mx_ifgreatereq(temperature as never, float(4000) as never, highX as never, lowX as never);
     const xc2 = mul(xc as never, xc as never);
     const xc3 = mul(xc2 as never, xc as never);
     const ycLow = add(
       add(mul(float(-1.1063814), xc3 as never) as never, mul(float(-1.3481102), xc2 as never) as never) as never,
-      add(mul(float(2.18555832), xc as never) as never, float(-0.20219683)) as never
+      add(mul(float(2.18555832), xc as never) as never, float(-0.20219683)) as never,
     );
     const ycMid = add(
       add(mul(float(-0.9549476), xc3 as never) as never, mul(float(-1.37418593), xc2 as never) as never) as never,
-      add(mul(float(2.09137015), xc as never) as never, float(-0.16748867)) as never
+      add(mul(float(2.09137015), xc as never) as never, float(-0.16748867)) as never,
     );
     const ycHigh = add(
       add(mul(float(3.081758), xc3 as never) as never, mul(float(-5.8733867), xc2 as never) as never) as never,
-      add(mul(float(3.75112997), xc as never) as never, float(-0.37001483)) as never
+      add(mul(float(3.75112997), xc as never) as never, float(-0.37001483)) as never,
     );
     const ycLowMid = mx_ifgreatereq(temperature as never, float(2222) as never, ycMid as never, ycLow as never);
     const yc = mx_ifgreatereq(temperature as never, float(4000) as never, ycHigh as never, ycLowMid as never);
@@ -836,17 +917,26 @@ export const buildNodeHandlerRegistry = (deps: NodeHandlerDeps): Map<string, Nod
     const xyz = vec3(x as never, y as never, z as never);
     const rgb = vec3(
       add(
-        add(mul(float(3.2406), getNodeChannel(xyz, 0) as never) as never, mul(float(-0.9689), getNodeChannel(xyz, 1) as never) as never) as never,
-        mul(float(0.0557), getNodeChannel(xyz, 2) as never) as never
+        add(
+          mul(float(3.2406), getNodeChannel(xyz, 0) as never) as never,
+          mul(float(-0.9689), getNodeChannel(xyz, 1) as never) as never,
+        ) as never,
+        mul(float(0.0557), getNodeChannel(xyz, 2) as never) as never,
       ) as never,
       add(
-        add(mul(float(-1.5372), getNodeChannel(xyz, 0) as never) as never, mul(float(1.8758), getNodeChannel(xyz, 1) as never) as never) as never,
-        mul(float(-0.204), getNodeChannel(xyz, 2) as never) as never
+        add(
+          mul(float(-1.5372), getNodeChannel(xyz, 0) as never) as never,
+          mul(float(1.8758), getNodeChannel(xyz, 1) as never) as never,
+        ) as never,
+        mul(float(-0.204), getNodeChannel(xyz, 2) as never) as never,
       ) as never,
       add(
-        add(mul(float(-0.4986), getNodeChannel(xyz, 0) as never) as never, mul(float(0.0415), getNodeChannel(xyz, 1) as never) as never) as never,
-        mul(float(1.057), getNodeChannel(xyz, 2) as never) as never
-      ) as never
+        add(
+          mul(float(-0.4986), getNodeChannel(xyz, 0) as never) as never,
+          mul(float(0.0415), getNodeChannel(xyz, 1) as never) as never,
+        ) as never,
+        mul(float(1.057), getNodeChannel(xyz, 2) as never) as never,
+      ) as never,
     );
     return max(rgb as never, vec3(0, 0, 0) as never);
   });
@@ -861,8 +951,14 @@ export const buildNodeHandlerRegistry = (deps: NodeHandlerDeps): Map<string, Nod
     const ior = mix(nMax as never, nMin as never, edgeColor as never);
     const np1 = add(ior as never, float(1));
     const nm1 = sub(ior as never, float(1));
-    const k2Numerator = sub(mul(mul(np1 as never, np1 as never) as never, clamped as never) as never, mul(nm1 as never, nm1 as never) as never);
-    const k2 = max(div(k2Numerator as never, sub(float(1), clamped as never) as never) as never, vec3(0, 0, 0) as never);
+    const k2Numerator = sub(
+      mul(mul(np1 as never, np1 as never) as never, clamped as never) as never,
+      mul(nm1 as never, nm1 as never) as never,
+    );
+    const k2 = max(
+      div(k2Numerator as never, sub(float(1), clamped as never) as never) as never,
+      vec3(0, 0, 0) as never,
+    );
     const extinction = sqrt(k2 as never);
     return outputName === 'extinction' ? extinction : ior;
   });
@@ -908,7 +1004,7 @@ export const buildNodeHandlerRegistry = (deps: NodeHandlerDeps): Map<string, Nod
         mix(getNodeChannel(bg, 0) as never, getNodeChannel(fg, 0) as never, factor as never),
         mix(getNodeChannel(bg, 1) as never, getNodeChannel(fg, 1) as never, factor as never),
         mix(getNodeChannel(bg, 2) as never, getNodeChannel(fg, 2) as never, factor as never),
-        mix(getNodeChannel(bg, 3) as never, getNodeChannel(fg, 3) as never, factor as never)
+        mix(getNodeChannel(bg, 3) as never, getNodeChannel(fg, 3) as never, factor as never),
       );
 
     const linearClamped = clamp(x as never, interval1 as never, interval2 as never);
@@ -925,7 +1021,11 @@ export const buildNodeHandlerRegistry = (deps: NodeHandlerDeps): Map<string, Nod
     const interpolationDistanceToStep = abs(sub(interpolation as never, float(2)) as never);
     const useStep = sub(float(1), step(float(0.5), interpolationDistanceToStep as never));
     const interpolated = mixColor4(mixedColor, stepColor, useStep);
-    const withinInterval = mixColor4(prevColor, interpolated, step(add(interval1 as never, float(1e-6)) as never, x as never));
+    const withinInterval = mixColor4(
+      prevColor,
+      interpolated,
+      step(add(interval1 as never, float(1e-6)) as never, x as never),
+    );
     return mixColor4(withinInterval, prevColor, step(numIntervals as never, intervalNum as never));
   });
 
@@ -939,7 +1039,7 @@ export const buildNodeHandlerRegistry = (deps: NodeHandlerDeps): Map<string, Nod
         mix(getNodeChannel(bg, 0) as never, getNodeChannel(fg, 0) as never, factor as never),
         mix(getNodeChannel(bg, 1) as never, getNodeChannel(fg, 1) as never, factor as never),
         mix(getNodeChannel(bg, 2) as never, getNodeChannel(fg, 2) as never, factor as never),
-        mix(getNodeChannel(bg, 3) as never, getNodeChannel(fg, 3) as never, factor as never)
+        mix(getNodeChannel(bg, 3) as never, getNodeChannel(fg, 3) as never, factor as never),
       );
 
     const clamped = clamp(texcoord as never, vec2(0, 0) as never, vec2(1, 1) as never);
@@ -950,17 +1050,23 @@ export const buildNodeHandlerRegistry = (deps: NodeHandlerDeps): Map<string, Nod
     const centered_t = sub(t as never, float(0.5));
 
     // standard = s, radial = distance from center, circular = angle/2pi, box = max(|s-0.5|, |t-0.5|)*2
-    const radialDist = sqrt(add(mul(centered_s as never, centered_s as never) as never, mul(centered_t as never, centered_t as never) as never) as never);
+    const radialDist = sqrt(
+      add(
+        mul(centered_s as never, centered_s as never) as never,
+        mul(centered_t as never, centered_t as never) as never,
+      ) as never,
+    );
     const radialVal = clamp(mul(radialDist as never, float(2)) as never, float(0), float(1));
 
     const circularAngle = add(
       div(atan2(centered_t as never, centered_s as never) as never, float(Math.PI * 2)) as never,
-      float(0.5)
+      float(0.5),
     );
 
     const boxVal = clamp(
       mul(max(abs(centered_s as never) as never, abs(centered_t as never) as never) as never, float(2)) as never,
-      float(0), float(1)
+      float(0),
+      float(1),
     );
 
     const typeDistanceToRadial = abs(sub(rampType as never, float(1)) as never);
@@ -976,8 +1082,10 @@ export const buildNodeHandlerRegistry = (deps: NodeHandlerDeps): Map<string, Nod
     const intervals: unknown[] = [];
     const colors: unknown[] = [];
     for (let i = 1; i <= 10; i += 1) {
-      intervals.push(r(node, `interval${i}`, i <= 2 ? (i - 1) : 1, context, scopeGraph));
-      colors.push(r(node, `color${i}`, vec4(i === 1 ? 0 : 1, i === 1 ? 0 : 1, i === 1 ? 0 : 1, 1), context, scopeGraph));
+      intervals.push(r(node, `interval${i}`, i <= 2 ? i - 1 : 1, context, scopeGraph));
+      colors.push(
+        r(node, `color${i}`, vec4(i === 1 ? 0 : 1, i === 1 ? 0 : 1, i === 1 ? 0 : 1, 1), context, scopeGraph),
+      );
     }
 
     let result: unknown = colors[0]!;
@@ -1002,7 +1110,11 @@ export const buildNodeHandlerRegistry = (deps: NodeHandlerDeps): Map<string, Nod
       const interpolationDistanceToStep = abs(sub(interpolation as never, float(2)) as never);
       const useStep = sub(float(1), step(float(0.5), interpolationDistanceToStep as never));
       const interpolated = mixColor4(mixedColor, stepColor, useStep);
-      const withinInterval = mixColor4(result, interpolated, step(add(iv1 as never, float(1e-6)) as never, rampX as never));
+      const withinInterval = mixColor4(
+        result,
+        interpolated,
+        step(add(iv1 as never, float(1e-6)) as never, rampX as never),
+      );
       result = mixColor4(withinInterval, result, step(numIntervals as never, intNum as never));
     }
 

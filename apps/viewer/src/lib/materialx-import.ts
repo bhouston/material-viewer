@@ -59,7 +59,9 @@ const importFromZipBuffer = async (buffer: ArrayBuffer, label: string): Promise<
     objectUrls.push(objectUrl);
 
     const relativePath = mtlxDir && path.startsWith(mtlxDir) ? path.slice(mtlxDir.length) : path;
-    const basename = relativePath.includes('/') ? relativePath.substring(relativePath.lastIndexOf('/') + 1) : relativePath;
+    const basename = relativePath.includes('/')
+      ? relativePath.substring(relativePath.lastIndexOf('/') + 1)
+      : relativePath;
 
     assetUrls[relativePath] = objectUrl;
     if (basename !== relativePath) {
@@ -128,7 +130,10 @@ export const importMaterialXFromUrl = async (url: string): Promise<ImportedMater
 
   const filename = filenameFromUrl(url);
   const contentType = response.headers.get('content-type') ?? '';
-  const isZip = isZipFile(filename) || contentType.includes('zip') || contentType === 'application/octet-stream' && isZipFile(filename);
+  const isZip =
+    isZipFile(filename) ||
+    contentType.includes('zip') ||
+    (contentType === 'application/octet-stream' && isZipFile(filename));
 
   if (isZip) {
     const buffer = await response.arrayBuffer();

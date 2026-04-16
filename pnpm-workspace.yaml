@@ -6,3 +6,4 @@ link-workspace-packages: true
 
 onlyBuiltDependencies:
   - esbuild
+  - unrs-resolver

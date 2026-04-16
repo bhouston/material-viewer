@@ -24,7 +24,7 @@ const readNumberLiteral = (value: unknown): number | undefined => {
 
 export const createThreeMaterialFromDocument = (
   document: MaterialXDocument,
-  options: MaterialXThreeCompileOptions = {}
+  options: MaterialXThreeCompileOptions = {},
 ): { material: MeshPhysicalNodeMaterial; result: MaterialXThreeCompileResult } => {
   const result = compileMaterialXToTSL(document, options);
   const material = new MeshPhysicalNodeMaterial();
@@ -34,7 +34,8 @@ export const createThreeMaterialFromDocument = (
   const transmissionLiteral = readNumberLiteral(transmissionAssignment);
   const hasTransmission =
     transmissionAssignment !== undefined && (transmissionLiteral === undefined ? true : transmissionLiteral > 0.0001);
-  const hasFractionalOpacity = opacityAssignment !== undefined && (opacityLiteral === undefined ? true : opacityLiteral < 0.9999);
+  const hasFractionalOpacity =
+    opacityAssignment !== undefined && (opacityLiteral === undefined ? true : opacityLiteral < 0.9999);
 
   material.color = new Color(1, 1, 1);
   material.colorNode = result.assignments.colorNode as never;

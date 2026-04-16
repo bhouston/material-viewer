@@ -1,41 +1,88 @@
-import { ClientOnly, createFileRoute, useHydrated, useNavigate } from '@tanstack/react-router'
-import { Download } from 'lucide-react'
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { z } from 'zod'
-import MaterialViewport from '../components/MaterialViewport'
-import { Badge } from '../components/ui/badge'
-import { Button } from '../components/ui/button'
-import { Select } from '../components/ui/select'
-import { Separator } from '../components/ui/separator'
-import { useMaterialXBackground } from '../hooks/useMaterialXBackground'
-import { useMaterialXBundleState } from '../hooks/useMaterialXBundleState'
-import { useMaterialXCompile } from '../hooks/useMaterialXCompile'
-import { useViewerTestInstrumentation } from '../hooks/useViewerTestInstrumentation'
-import { downloadMaterialXZip } from '../lib/materialx-download'
-import { materialXBackgroundPacks } from '../lib/backgrounds'
-import { getMaterialXSamplePacks } from '../lib/materialx-samples.functions'
-import { cn } from '../lib/utils'
+import { ClientOnly, createFileRoute, useHydrated, useNavigate } from '@tanstack/react-router';
+import { Check, Code2, Copy, Download } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { z } from 'zod';
+import MaterialViewport from '../components/MaterialViewport';
+import { Badge } from '../components/ui/badge';
+import { Button } from '../components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '../components/ui/dialog';
+import { Input } from '../components/ui/input';
+import { Select } from '../components/ui/select';
+import { Separator } from '../components/ui/separator';
+import { useMaterialXBackground } from '../hooks/useMaterialXBackground';
+import { useMaterialXBundleState } from '../hooks/useMaterialXBundleState';
+import { useMaterialXCompile } from '../hooks/useMaterialXCompile';
+import { useViewerTestInstrumentation } from '../hooks/useViewerTestInstrumentation';
+import { downloadMaterialXZip } from '../lib/materialx-download';
+import { materialXBackgroundPacks } from '../lib/backgrounds';
+import { getMaterialXSamplePacks } from '../lib/materialx-samples.functions';
+import type { PreviewGeometry } from '../components/Viewer';
+import { cn } from '../lib/utils';
 
 const indexSearchSchema = z.object({
-  material: z.preprocess((value) => (typeof value === 'string' && value.length > 0 ? value : undefined), z.string().optional()),
-})
+  material: z.preprocess(
+    (value) => (typeof value === 'string' && value.length > 0 ? value : undefined),
+    z.string().optional(),
+  ),
+});
 
 export const Route = createFileRoute('/')({
   validateSearch: indexSearchSchema,
   loader: async () => {
-    const samplePacks = await getMaterialXSamplePacks()
-    return { samplePacks }
+    const samplePacks = await getMaterialXSamplePacks();
+    return { samplePacks };
   },
   component: App,
-})
+});
+
+const DEFAULT_MATERIAL = 'open-pbr-soapbubble';
+
+/**
+ * Resolves a `material` search param value to a canonical fetch URL and label.
+ * Returns null when the material is "none" / empty (meaning clear the bundle).
+ */
+function resolveMaterialToUrl(
+  material: string,
+  samplePacks: Array<{ id: string; directory: string }>,
+): { url: string; label: string } | null {
+  const resolved = material.trim();
+  if (!resolved || resolved === 'none') return null;
+
+  // Already a URL
+  if (resolved.startsWith('http://') || resolved.startsWith('https://') || resolved.startsWith('/')) {
+    return { url: resolved, label: '' };
+  }
+
+  // Sample id
+  const sample = samplePacks.find((entry) => entry.id === resolved);
+  if (sample) {
+    return {
+      url: `/api/asset/${encodeURIComponent(sample.id)}.mtlx.zip`,
+      label: sample.directory,
+    };
+  }
+
+  // Unknown value – treat as-is (URL-like or fallthrough)
+  return { url: resolved, label: '' };
+}
 
 function App() {
-  const { samplePacks } = Route.useLoaderData()
-  const { material: materialParam } = Route.useSearch()
-  const navigate = useNavigate()
-  const hydrated = useHydrated()
+  const { samplePacks } = Route.useLoaderData();
+  const { material: materialParam } = Route.useSearch();
+  const navigate = useNavigate();
+  const hydrated = useHydrated();
 
-  const [selectedSample, setSelectedSample] = useState('')
+  const [selectedSample, setSelectedSample] = useState('');
+  const [currentPreviewGeometry, setCurrentPreviewGeometry] = useState<PreviewGeometry>('totem');
+  const [materialSourceUrl, setMaterialSourceUrl] = useState<string | null>(null);
+
   const {
     xml,
     sampleLabel,
@@ -44,133 +91,147 @@ function App() {
     clearBundle,
     loadFromUrl,
     importFiles: importBundleFiles,
-  } = useMaterialXBundleState()
-  const { selectedBackground, backgroundError, backgroundCompileState, onBackgroundChange } = useMaterialXBackground(hydrated)
-  const compileState = useMaterialXCompile({ xml, assetUrls, hydrated })
+  } = useMaterialXBundleState();
+  const { selectedBackground, backgroundError, backgroundCompileState, onBackgroundChange } =
+    useMaterialXBackground(hydrated);
+  const compileState = useMaterialXCompile({ xml, assetUrls, hydrated });
 
-  const [isDragging, setIsDragging] = useState(false)
-  const [isDownloading, setIsDownloading] = useState(false)
-  const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const [isDragging, setIsDragging] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [isCopied, setIsCopied] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  const materialLoaded = xml.trim() !== ''
-  useViewerTestInstrumentation(false, hydrated)
+  const materialLoaded = xml.trim() !== '';
+  useViewerTestInstrumentation(false, hydrated);
 
-  const warningCount = compileState.result?.warnings.length ?? 0
-  const unsupportedCategoryCount = compileState.result?.unsupportedCategories.length ?? 0
-  const unsupportedWarningCount = (compileState.result?.warnings ?? []).filter((warning) => warning.code === 'unsupported-node').length
+  const warningCount = compileState.result?.warnings.length ?? 0;
+  const unsupportedCategoryCount = compileState.result?.unsupportedCategories.length ?? 0;
+  const unsupportedWarningCount = (compileState.result?.warnings ?? []).filter(
+    (warning) => warning.code === 'unsupported-node',
+  ).length;
 
-  const isUrl = (value: string): boolean => value.startsWith('http://') || value.startsWith('https://') || value.startsWith('/')
-
-  const DEFAULT_MATERIAL = 'open-pbr-soapbubble'
-
-  const loadSampleById = useCallback(
-    async (sampleId: string) => {
-      const sample = samplePacks.find((entry) => entry.id === sampleId)
-      if (!sample) {
-        throw new Error(`Unknown sample: ${sampleId}`)
-      }
-
-      await loadFromUrl(`/api/asset/${encodeURIComponent(sample.id)}.mtlx.zip`, sample.directory)
-      setSelectedSample(sample.id)
-    },
-    [loadFromUrl, samplePacks],
-  )
-
+  // Unified material loading: resolve param -> canonical URL -> loadFromUrl
   useEffect(() => {
-    const resolved = materialParam ?? DEFAULT_MATERIAL
-    if (resolved === 'none') {
-      clearBundle()
-      setSelectedSample('')
-      return
+    const paramValue = materialParam ?? DEFAULT_MATERIAL;
+    const resolved = resolveMaterialToUrl(paramValue, samplePacks);
+
+    if (!resolved) {
+      clearBundle();
+      setSelectedSample('');
+      setMaterialSourceUrl(null);
+      return;
     }
+
+    const { url, label } = resolved;
 
     const syncFromSearch = async () => {
       try {
-        if (isUrl(resolved)) {
-          await loadFromUrl(resolved)
-          setSelectedSample('')
-          return
-        }
-
-        await loadSampleById(resolved)
+        await loadFromUrl(url, label || undefined);
+        // Track which sample is selected in the dropdown (if any)
+        const matchingSample = samplePacks.find(
+          (entry) => `/api/asset/${encodeURIComponent(entry.id)}.mtlx.zip` === url,
+        );
+        setSelectedSample(matchingSample?.id ?? '');
+        setMaterialSourceUrl(url);
       } catch (error) {
-        clearBundle()
-        console.error('Failed to load material:', error)
+        clearBundle();
+        setMaterialSourceUrl(null);
+        console.error('Failed to load material:', error);
       }
-    }
+    };
 
-    void syncFromSearch()
-  }, [clearBundle, loadFromUrl, loadSampleById, materialParam])
+    void syncFromSearch();
+  }, [clearBundle, loadFromUrl, materialParam, samplePacks]);
 
   const handleDropdownChange = useCallback(
     (sampleId: string) => {
       if (sampleId) {
-        void navigate({ to: '/', search: { material: sampleId } })
+        void navigate({ to: '/', search: { material: sampleId } });
       } else {
-        setSelectedSample('')
-        clearBundle()
-        void navigate({ to: '/', search: { material: 'none' } })
+        setSelectedSample('');
+        clearBundle();
+        void navigate({ to: '/', search: { material: 'none' } });
       }
     },
     [clearBundle, navigate],
-  )
+  );
 
   const importFiles = useCallback(
     async (files: File[]) => {
       try {
-        await importBundleFiles(files)
-        setSelectedSample('')
-        void navigate({ to: '/', search: { material: undefined } })
+        await importBundleFiles(files);
+        setSelectedSample('');
+        setMaterialSourceUrl(null);
+        void navigate({ to: '/', search: { material: undefined } });
       } catch (error) {
-        console.error('Import failed:', error)
+        console.error('Import failed:', error);
       }
     },
     [importBundleFiles, navigate],
-  )
+  );
 
   const handleDrop = useCallback(
     (event: React.DragEvent<HTMLElement>) => {
-      event.preventDefault()
-      setIsDragging(false)
-      const files = [...event.dataTransfer.files]
-      if (files.length === 0) {
-        return
-      }
-      void importFiles(files)
+      event.preventDefault();
+      setIsDragging(false);
+      const files = [...event.dataTransfer.files];
+      if (files.length === 0) return;
+      void importFiles(files);
     },
     [importFiles],
-  )
+  );
 
   const handleDragOver = useCallback((event: React.DragEvent<HTMLElement>) => {
-    event.preventDefault()
-    setIsDragging(true)
-  }, [])
+    event.preventDefault();
+    setIsDragging(true);
+  }, []);
 
   const handleDragLeave = useCallback(() => {
-    setIsDragging(false)
-  }, [])
+    setIsDragging(false);
+  }, []);
 
   const handleFileInput = useCallback(
     (event: React.ChangeEvent<HTMLInputElement>) => {
-      const files = event.target.files ? [...event.target.files] : []
-      if (files.length === 0) {
-        return
-      }
-      void importFiles(files)
-      event.target.value = ''
+      const files = event.target.files ? [...event.target.files] : [];
+      if (files.length === 0) return;
+      void importFiles(files);
+      event.target.value = '';
     },
     [importFiles],
-  )
+  );
 
   const handleDownload = useCallback(async () => {
-    if (!xml.trim()) return
-    setIsDownloading(true)
+    if (!xml.trim()) return;
+    setIsDownloading(true);
     try {
-      await downloadMaterialXZip(xml, assetUrls, sampleLabel || 'material')
+      await downloadMaterialXZip(xml, assetUrls, sampleLabel || 'material');
     } finally {
-      setIsDownloading(false)
+      setIsDownloading(false);
     }
-  }, [xml, assetUrls, sampleLabel])
+  }, [xml, assetUrls, sampleLabel]);
+
+  // Build the /embed URL reflecting current viewer state
+  const embedUrl = (() => {
+    if (!materialSourceUrl) return null;
+    const params = new URLSearchParams();
+    // Use an absolute URL for the material so it works when embedded cross-origin
+    const absUrl = materialSourceUrl.startsWith('/')
+      ? `${typeof window !== 'undefined' ? window.location.origin : ''}${materialSourceUrl}`
+      : materialSourceUrl;
+    params.set('url', absUrl);
+    if (currentPreviewGeometry !== 'totem') params.set('model', currentPreviewGeometry);
+    const defaultBg = materialXBackgroundPacks[0]?.id ?? '';
+    if (selectedBackground && selectedBackground !== defaultBg) params.set('background', selectedBackground);
+    const base = typeof window !== 'undefined' ? `${window.location.origin}/embed` : '/embed';
+    return `${base}?${params.toString()}`;
+  })();
+
+  const handleCopyEmbedUrl = useCallback(async () => {
+    if (!embedUrl) return;
+    await navigator.clipboard.writeText(embedUrl);
+    setIsCopied(true);
+    setTimeout(() => setIsCopied(false), 2000);
+  }, [embedUrl]);
 
   const viewportElement = (
     <MaterialViewport
@@ -179,9 +240,10 @@ function App() {
       backgroundPacks={materialXBackgroundPacks}
       nodeMaterial={compileState.material}
       onBackgroundChange={(backgroundId) => void onBackgroundChange(backgroundId)}
+      onPreviewGeometryChange={setCurrentPreviewGeometry}
       selectedBackground={selectedBackground}
     />
-  )
+  );
 
   return (
     <div className="page-wrap space-y-4">
@@ -193,11 +255,13 @@ function App() {
           value={selectedSample}
         >
           <option value="">None</option>
-          {[...samplePacks].sort((a, b) => a.directory.localeCompare(b.directory)).map((sample) => (
-            <option key={sample.id} data-directory={sample.directory} value={sample.id}>
-              {sample.directory}
-            </option>
-          ))}
+          {[...samplePacks]
+            .sort((a, b) => a.directory.localeCompare(b.directory))
+            .map((sample) => (
+              <option key={sample.id} data-directory={sample.directory} value={sample.id}>
+                {sample.directory}
+              </option>
+            ))}
         </Select>
         {materialLoaded && (
           <Button
@@ -210,6 +274,46 @@ function App() {
             <Download className="mr-1.5 size-4" />
             {isDownloading ? 'Downloading...' : 'Download .mtlx.zip'}
           </Button>
+        )}
+        {materialLoaded && (
+          <Dialog onOpenChange={() => setIsCopied(false)}>
+            <DialogTrigger asChild>
+              <Button disabled={!embedUrl} size="sm" type="button" variant="outline">
+                <Code2 className="mr-1.5 size-4" />
+                Embed
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-xl">
+              <DialogHeader>
+                <DialogTitle>Embed this material</DialogTitle>
+                <DialogDescription>
+                  Use the URL below to embed the current material in an iframe or share a standalone preview.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="flex gap-2">
+                <Input
+                  readOnly
+                  value={embedUrl ?? ''}
+                  className="font-mono text-xs"
+                  onFocus={(e) => e.currentTarget.select()}
+                />
+                <Button
+                  size="icon"
+                  type="button"
+                  variant="outline"
+                  onClick={() => void handleCopyEmbedUrl()}
+                  aria-label="Copy embed URL"
+                >
+                  {isCopied ? <Check className="size-4" /> : <Copy className="size-4" />}
+                </Button>
+              </div>
+              {isCopied && <p className="text-xs text-muted-foreground">Copied!</p>}
+              <p className="text-xs text-muted-foreground">Example iframe usage:</p>
+              <pre className="overflow-x-auto rounded-md border border-border/60 bg-muted/40 px-3 py-2 text-xs">
+                {`<iframe\n  src="${embedUrl ?? ''}"\n  width="640"\n  height="480"\n  frameborder="0"\n  allowfullscreen\n></iframe>`}
+              </pre>
+            </DialogContent>
+          </Dialog>
         )}
       </div>
 
@@ -265,7 +369,11 @@ function App() {
       {materialLoaded && (
         <p className="text-center text-xs text-muted-foreground">
           Drag a .mtlx file onto the viewer or{' '}
-          <button className="underline hover:text-foreground" onClick={() => fileInputRef.current?.click()} type="button">
+          <button
+            className="underline hover:text-foreground"
+            onClick={() => fileInputRef.current?.click()}
+            type="button"
+          >
             click here
           </button>{' '}
           to load a different material.
@@ -289,7 +397,9 @@ function App() {
               )}
               Compilation
               {!compileState.error && warningCount > 0 && (
-                <span className="text-xs text-muted-foreground">({warningCount} warning{warningCount !== 1 ? 's' : ''})</span>
+                <span className="text-xs text-muted-foreground">
+                  ({warningCount} warning{warningCount !== 1 ? 's' : ''})
+                </span>
               )}
             </summary>
             <div className="mt-2 space-y-4 rounded-md border border-border/80 px-4 py-3 text-sm">
@@ -355,5 +465,5 @@ function App() {
         </div>
       )}
     </div>
-  )
+  );
 }

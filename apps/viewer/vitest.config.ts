@@ -1,6 +1,6 @@
-import { mergeConfig, defineConfig } from 'vitest/config'
-import { playwright } from '@vitest/browser-playwright'
-import viteConfig from './vite.config'
+import { mergeConfig, defineConfig } from 'vitest/config';
+import { playwright } from '@vitest/browser-playwright';
+import viteConfig from './vite.config';
 
 export default mergeConfig(
   viteConfig,
@@ -23,4 +23,4 @@ export default mergeConfig(
       hookTimeout: 60_000,
     },
   }),
-)
+);

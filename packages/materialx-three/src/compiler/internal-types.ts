@@ -19,5 +19,5 @@ export type NodeHandler = (
   node: MaterialXNode,
   context: CompileContext,
   scopeGraph: MaterialXNodeGraph | undefined,
-  outputName: string | undefined
+  outputName: string | undefined,
 ) => unknown;

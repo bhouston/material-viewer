@@ -26,10 +26,16 @@ export const createResolveInputNode =
       node: MaterialXNode,
       context: CompileContext,
       scopeGraph?: MaterialXNodeGraph,
-      outputName?: string
-    ) => unknown
+      outputName?: string,
+    ) => unknown,
   ) =>
-  (node: MaterialXNode, inputName: string, fallback: unknown, context: CompileContext, scopeGraph?: MaterialXNodeGraph): unknown => {
+  (
+    node: MaterialXNode,
+    inputName: string,
+    fallback: unknown,
+    context: CompileContext,
+    scopeGraph?: MaterialXNodeGraph,
+  ): unknown => {
     const input = readInput(node, inputName);
     if (!input) {
       return toNodeValue(fallback, undefined);

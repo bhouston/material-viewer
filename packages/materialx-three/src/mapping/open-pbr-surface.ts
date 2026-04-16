@@ -39,7 +39,7 @@ const toGltfDispersion = (abbeNumber: unknown, dispersionScale: unknown): unknow
 
 export const buildOpenPbrSurfaceAssignments = (
   surfaceNode: MaterialXNode,
-  helpers: OpenPbrSurfaceInputs
+  helpers: OpenPbrSurfaceInputs,
 ): MaterialSlotAssignments => {
   const hasInput = (name: string) => surfaceNode.inputs.some((input) => input.name === name);
   const baseWeight = helpers.getInputNode(surfaceNode, 'base_weight', 1);
@@ -64,12 +64,13 @@ export const buildOpenPbrSurfaceAssignments = (
     : undefined;
   const hasTransmissionDispersionScale = hasInput('transmission_dispersion_scale');
   const hasTransmissionDispersionAbbe = hasInput('transmission_dispersion_abbe_number');
-  const dispersion = hasTransmissionDispersionScale || hasTransmissionDispersionAbbe
-    ? toGltfDispersion(
-        helpers.getInputNode(surfaceNode, 'transmission_dispersion_abbe_number', 20),
-        helpers.getInputNode(surfaceNode, 'transmission_dispersion_scale', 0)
-      )
-    : undefined;
+  const dispersion =
+    hasTransmissionDispersionScale || hasTransmissionDispersionAbbe
+      ? toGltfDispersion(
+          helpers.getInputNode(surfaceNode, 'transmission_dispersion_abbe_number', 20),
+          helpers.getInputNode(surfaceNode, 'transmission_dispersion_scale', 0),
+        )
+      : undefined;
   const ior = helpers.getInputNode(surfaceNode, 'specular_ior', 1.5);
   const normal = helpers.getInputNode(surfaceNode, 'geometry_normal', undefined);
   const opacity = helpers.getInputNode(surfaceNode, 'geometry_opacity', undefined);
@@ -79,8 +80,11 @@ export const buildOpenPbrSurfaceAssignments = (
   const emissionColor = helpers.getInputNode(surfaceNode, 'emission_color', [1, 1, 1]);
   const emissionLuminance = helpers.getInputNode(surfaceNode, 'emission_luminance', 0);
 
-  const colorNode = (baseColor as { mul?: (other: unknown) => unknown }).mul?.(baseWeight) ?? mul(baseColor as never, baseWeight as never);
-  const sheenNode = (fuzzColor as { mul?: (other: unknown) => unknown }).mul?.(fuzz) ?? mul(fuzzColor as never, fuzz as never);
+  const colorNode =
+    (baseColor as { mul?: (other: unknown) => unknown }).mul?.(baseWeight) ??
+    mul(baseColor as never, baseWeight as never);
+  const sheenNode =
+    (fuzzColor as { mul?: (other: unknown) => unknown }).mul?.(fuzz) ?? mul(fuzzColor as never, fuzz as never);
   const emissiveNode =
     (emissionColor as { mul?: (other: unknown) => unknown }).mul?.(emissionLuminance) ??
     mul(emissionColor as never, emissionLuminance as never);

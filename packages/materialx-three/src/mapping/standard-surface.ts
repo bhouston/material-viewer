@@ -36,7 +36,7 @@ const toAttenuationDistance = (depth: unknown, hasTransmissionColorInput: boolea
 
 export const buildStandardSurfaceAssignments = (
   surfaceNode: MaterialXNode,
-  helpers: StandardSurfaceInputs
+  helpers: StandardSurfaceInputs,
 ): MaterialSlotAssignments => {
   const hasInput = (name: string) => surfaceNode.inputs.some((input) => input.name === name);
   const base = helpers.getInputNode(surfaceNode, 'base', 1);
@@ -60,7 +60,9 @@ export const buildStandardSurfaceAssignments = (
   const hasTransmission = hasInput('transmission');
   const transmission = hasTransmission ? helpers.getInputNode(surfaceNode, 'transmission', 0) : undefined;
   const hasTransmissionColorInput = hasInput('transmission_color');
-  const transmissionColor = hasTransmission ? helpers.getInputNode(surfaceNode, 'transmission_color', [1, 1, 1]) : undefined;
+  const transmissionColor = hasTransmission
+    ? helpers.getInputNode(surfaceNode, 'transmission_color', [1, 1, 1])
+    : undefined;
   const transmissionDepth = hasInput('transmission_depth')
     ? helpers.getInputNode(surfaceNode, 'transmission_depth', undefined)
     : undefined;
@@ -71,7 +73,7 @@ export const buildStandardSurfaceAssignments = (
   const thinFilmIOR = helpers.getInputNode(
     surfaceNode,
     'thin_film_IOR',
-    helpers.getInputNode(surfaceNode, 'thin_film_ior', 1.3)
+    helpers.getInputNode(surfaceNode, 'thin_film_ior', 1.3),
   );
   const normal = helpers.getInputNode(surfaceNode, 'normal', undefined);
 

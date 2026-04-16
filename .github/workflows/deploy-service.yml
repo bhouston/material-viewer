@@ -6,26 +6,26 @@ on:
       service_name:
         required: true
         type: string
-        description: "Cloud Run service name"
+        description: 'Cloud Run service name'
       dockerfile:
         required: true
         type: string
-        description: "Path to Dockerfile"
+        description: 'Path to Dockerfile'
       context:
         required: false
         type: string
-        description: "Docker build context"
-        default: "."
+        description: 'Docker build context'
+        default: '.'
       build_args:
         required: false
         type: string
-        description: "Docker build args (multi-line KEY=VALUE)"
-        default: ""
+        description: 'Docker build args (multi-line KEY=VALUE)'
+        default: ''
       env_vars:
         required: false
         type: string
-        description: "Cloud Run env vars (multi-line KEY=VALUE)"
-        default: ""
+        description: 'Cloud Run env vars (multi-line KEY=VALUE)'
+        default: ''
     secrets:
       GCP_SA_KEY:
         required: true
@@ -47,7 +47,7 @@ jobs:
         id: auth
         uses: google-github-actions/auth@v2
         with:
-          credentials_json: "${{ secrets.GCP_SA_KEY }}"
+          credentials_json: '${{ secrets.GCP_SA_KEY }}'
 
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v2
@@ -76,5 +76,5 @@ jobs:
           service: ${{ inputs.service_name }}
           region: ${{ env.REGION }}
           image: ${{ env.IMAGE_PATH }}
-          flags: "--allow-unauthenticated"
+          flags: '--allow-unauthenticated'
           env_vars: ${{ inputs.env_vars }}

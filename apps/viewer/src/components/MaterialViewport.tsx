@@ -1,27 +1,28 @@
-import { useEffect, useRef, useState } from 'react'
-import type { MeshPhysicalNodeMaterial } from 'three/webgpu'
-import type { MaterialXBackgroundPack } from '../lib/backgrounds'
-import Viewer from './Viewer'
-import type { PreviewGeometry, ViewerHandle } from './Viewer'
-import { Button } from './ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
-import { Label } from './ui/label'
-import { Select } from './ui/select'
+import { useEffect, useRef, useState } from 'react';
+import type { MeshPhysicalNodeMaterial } from 'three/webgpu';
+import type { MaterialXBackgroundPack } from '../lib/backgrounds';
+import Viewer from './Viewer';
+import type { PreviewGeometry, ViewerHandle } from './Viewer';
+import { Button } from './ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
+import { Label } from './ui/label';
+import { Select } from './ui/select';
 
 interface MaterialViewportProps {
-  nodeMaterial?: MeshPhysicalNodeMaterial
-  backgroundMaterial?: MeshPhysicalNodeMaterial
-  backgroundPacks: MaterialXBackgroundPack[]
-  selectedBackground: string
-  onBackgroundChange: (backgroundId: string) => void
-  backgroundError?: string
-  initialPreviewGeometry?: PreviewGeometry
-  lockPreviewGeometry?: boolean
-  lockBackground?: boolean
-  showControls?: boolean
-  variant?: 'panel' | 'bare'
-  viewerClassName?: string
-  viewerFixedSize?: number
+  nodeMaterial?: MeshPhysicalNodeMaterial;
+  backgroundMaterial?: MeshPhysicalNodeMaterial;
+  backgroundPacks: MaterialXBackgroundPack[];
+  selectedBackground: string;
+  onBackgroundChange: (backgroundId: string) => void;
+  onPreviewGeometryChange?: (geometry: PreviewGeometry) => void;
+  backgroundError?: string;
+  initialPreviewGeometry?: PreviewGeometry;
+  lockPreviewGeometry?: boolean;
+  lockBackground?: boolean;
+  showControls?: boolean;
+  variant?: 'panel' | 'bare';
+  viewerClassName?: string;
+  viewerFixedSize?: number;
 }
 
 export default function MaterialViewport({
@@ -30,6 +31,7 @@ export default function MaterialViewport({
   backgroundPacks,
   selectedBackground,
   onBackgroundChange,
+  onPreviewGeometryChange,
   backgroundError,
   initialPreviewGeometry = 'totem',
   lockPreviewGeometry = false,
@@ -39,18 +41,23 @@ export default function MaterialViewport({
   viewerClassName,
   viewerFixedSize,
 }: MaterialViewportProps) {
-  const viewerRef = useRef<ViewerHandle | null>(null)
-  const [rendererLabel, setRendererLabel] = useState('WebGL fallback')
-  const [previewGeometry, setPreviewGeometry] = useState<PreviewGeometry>(initialPreviewGeometry)
-  const [previewGeometryError, setPreviewGeometryError] = useState<string>()
+  const viewerRef = useRef<ViewerHandle | null>(null);
+  const [rendererLabel, setRendererLabel] = useState('WebGL fallback');
+  const [previewGeometry, setPreviewGeometry] = useState<PreviewGeometry>(initialPreviewGeometry);
+  const [previewGeometryError, setPreviewGeometryError] = useState<string>();
 
   useEffect(() => {
-    setPreviewGeometry(initialPreviewGeometry)
-  }, [initialPreviewGeometry])
+    setPreviewGeometry(initialPreviewGeometry);
+  }, [initialPreviewGeometry]);
+
+  const handlePreviewGeometryChange = (geometry: PreviewGeometry) => {
+    setPreviewGeometry(geometry);
+    onPreviewGeometryChange?.(geometry);
+  };
 
   const handleResetView = () => {
-    viewerRef.current?.resetView()
-  }
+    viewerRef.current?.resetView();
+  };
 
   const viewerElement = (
     <Viewer
@@ -59,18 +66,20 @@ export default function MaterialViewport({
       fixedSize={viewerFixedSize}
       nodeMaterial={nodeMaterial}
       onPreviewGeometryErrorChange={setPreviewGeometryError}
-      onPreviewGeometryFallback={setPreviewGeometry}
+      onPreviewGeometryFallback={handlePreviewGeometryChange}
       onRendererLabelChange={setRendererLabel}
       previewGeometry={previewGeometry}
       viewportClassName={viewerClassName}
     />
-  )
+  );
 
   const controlBlock = showControls ? (
     <>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <CardTitle className="text-base">Preview</CardTitle>
-        <span className="rounded-md border border-border/80 bg-muted/60 px-2 py-1 text-xs text-muted-foreground">{rendererLabel}</span>
+        <span className="rounded-md border border-border/80 bg-muted/60 px-2 py-1 text-xs text-muted-foreground">
+          {rendererLabel}
+        </span>
       </div>
       <div className="grid gap-3 md:grid-cols-[minmax(0,140px)_minmax(0,220px)_auto] md:items-end">
         <div className="space-y-1.5">
@@ -82,7 +91,7 @@ export default function MaterialViewport({
             id="preview-geometry"
             data-testid="preview-geometry-select"
             disabled={lockPreviewGeometry}
-            onChange={(event) => setPreviewGeometry(event.target.value as PreviewGeometry)}
+            onChange={(event) => handlePreviewGeometryChange(event.target.value as PreviewGeometry)}
             value={previewGeometry}
           >
             <option value="totem">Totem</option>
@@ -124,7 +133,7 @@ export default function MaterialViewport({
         </div>
       </div>
     </>
-  ) : null
+  ) : null;
 
   const errorBlock = (
     <>
@@ -139,7 +148,7 @@ export default function MaterialViewport({
         </p>
       ) : null}
     </>
-  )
+  );
 
   if (variant === 'bare') {
     return (
@@ -147,7 +156,7 @@ export default function MaterialViewport({
         {errorBlock}
         {viewerElement}
       </div>
-    )
+    );
   }
 
   return (
@@ -158,5 +167,5 @@ export default function MaterialViewport({
         {viewerElement}
       </CardContent>
     </Card>
-  )
+  );
 }

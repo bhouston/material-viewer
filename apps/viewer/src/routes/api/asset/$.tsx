@@ -1,38 +1,38 @@
-import { createFileRoute } from '@tanstack/react-router'
-import { createMaterialXZipPayloadByMaterialName } from '../../../lib/materialx-zip.server'
+import { createFileRoute } from '@tanstack/react-router';
+import { createMaterialXZipPayloadByMaterialName } from '../../../lib/materialx-zip.server';
 
-const ZIP_SUFFIX = '.mtlx.zip'
+const ZIP_SUFFIX = '.mtlx.zip';
 
 const parseMaterialName = (splat: string | undefined): string | undefined => {
-  const raw = splat?.trim()
+  const raw = splat?.trim();
   if (!raw) {
-    return undefined
+    return undefined;
   }
 
   // Only allow a single basename-like token ending in .mtlx.zip.
   if (raw.includes('/') || raw.includes('\\') || raw.includes('..')) {
-    return undefined
+    return undefined;
   }
   if (!raw.endsWith(ZIP_SUFFIX)) {
-    return undefined
+    return undefined;
   }
 
-  const materialName = raw.slice(0, -ZIP_SUFFIX.length)
-  return materialName.length > 0 ? materialName : undefined
-}
+  const materialName = raw.slice(0, -ZIP_SUFFIX.length);
+  return materialName.length > 0 ? materialName : undefined;
+};
 
 export const Route = createFileRoute('/api/asset/$')({
   server: {
     handlers: {
       GET: async ({ params }) => {
-        const materialName = parseMaterialName(params._splat)
+        const materialName = parseMaterialName(params._splat);
         if (!materialName) {
-          return new Response('Invalid asset path, expected <materialName>.mtlx.zip', { status: 400 })
+          return new Response('Invalid asset path, expected <materialName>.mtlx.zip', { status: 400 });
         }
 
-        const payload = await createMaterialXZipPayloadByMaterialName(materialName)
+        const payload = await createMaterialXZipPayloadByMaterialName(materialName);
         if (!payload) {
-          return new Response(`Unknown material sample: ${materialName}`, { status: 404 })
+          return new Response(`Unknown material sample: ${materialName}`, { status: 404 });
         }
 
         return new Response(payload.zip, {
@@ -42,8 +42,8 @@ export const Route = createFileRoute('/api/asset/$')({
             'Content-Disposition': `inline; filename="${payload.sampleDirectory}.mtlx.zip"`,
             'Cache-Control': 'public, max-age=300',
           },
-        })
+        });
       },
     },
   },
-})
+});

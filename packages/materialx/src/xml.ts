@@ -222,10 +222,10 @@ export const parseMaterialX = (xml: string): MaterialXDocument => {
       elements.push(parseElement(tag, entry));
     }
   }
-  const nodeGraphs = elements.filter((entry) => entry.name === 'nodegraph').map((entry) => parseNodeGraphFromElement(entry));
-  const nodes = elements
-    .filter((entry) => entry.name !== 'nodegraph')
-    .map((entry) => parseNodeFromElement(entry));
+  const nodeGraphs = elements
+    .filter((entry) => entry.name === 'nodegraph')
+    .map((entry) => parseNodeGraphFromElement(entry));
+  const nodes = elements.filter((entry) => entry.name !== 'nodegraph').map((entry) => parseNodeFromElement(entry));
 
   return {
     attributes,

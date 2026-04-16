@@ -12,7 +12,7 @@ export function compileNode(
   node: MaterialXNode,
   context: CompileContext,
   scopeGraph?: MaterialXNodeGraph,
-  outputName?: string
+  outputName?: string,
 ): unknown {
   const key = cacheKey(node, scopeGraph, outputName);
   const cached = context.cache.get(key);

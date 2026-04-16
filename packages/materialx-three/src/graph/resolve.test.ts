@@ -8,7 +8,7 @@ import { buildGraphIndex, resolveInputReference, topologicallySortFromNode } fro
 const sourceDir = path.dirname(fileURLToPath(import.meta.url));
 const fixturePath = path.resolve(
   sourceDir,
-  '../../../../../MaterialX/resources/Materials/Examples/StandardSurface/standard_surface_brick_procedural.mtlx'
+  '../../../../../MaterialX/resources/Materials/Examples/StandardSurface/standard_surface_brick_procedural.mtlx',
 );
 
 describe('graph resolver', () => {

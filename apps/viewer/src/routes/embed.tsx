@@ -1,17 +1,17 @@
-import { ClientOnly, createFileRoute, useHydrated } from '@tanstack/react-router'
-import { useEffect, useMemo } from 'react'
-import { z } from 'zod'
-import MaterialViewport from '../components/MaterialViewport'
-import { useMaterialXBackground } from '../hooks/useMaterialXBackground'
-import { useMaterialXBundleState } from '../hooks/useMaterialXBundleState'
-import { useMaterialXCompile } from '../hooks/useMaterialXCompile'
-import { useViewerTestInstrumentation } from '../hooks/useViewerTestInstrumentation'
-import { materialXBackgroundPacks } from '../lib/backgrounds'
-import type { PreviewGeometry } from '../components/Viewer'
+import { ClientOnly, createFileRoute, useHydrated } from '@tanstack/react-router';
+import { useEffect, useMemo } from 'react';
+import { z } from 'zod';
+import MaterialViewport from '../components/MaterialViewport';
+import { useMaterialXBackground } from '../hooks/useMaterialXBackground';
+import { useMaterialXBundleState } from '../hooks/useMaterialXBundleState';
+import { useMaterialXCompile } from '../hooks/useMaterialXCompile';
+import { useViewerTestInstrumentation } from '../hooks/useViewerTestInstrumentation';
+import { materialXBackgroundPacks } from '../lib/backgrounds';
+import type { PreviewGeometry } from '../components/Viewer';
 
-const allowedModels = new Set<PreviewGeometry>(['totem', 'sphere', 'plane', 'cube'])
-const allowedBackgrounds = new Set(materialXBackgroundPacks.map((entry) => entry.id))
-const defaultBackground = materialXBackgroundPacks[0]?.id ?? 'checkerboard'
+const allowedModels = new Set<PreviewGeometry>(['totem', 'sphere', 'plane', 'cube']);
+const allowedBackgrounds = new Set(materialXBackgroundPacks.map((entry) => entry.id));
+const defaultBackground = materialXBackgroundPacks[0]?.id ?? 'checkerboard';
 
 const embedSearchSchema = z.object({
   url: z.preprocess((value) => (typeof value === 'string' ? value : undefined), z.string().optional()),
@@ -23,54 +23,59 @@ const embedSearchSchema = z.object({
     (value) => (typeof value === 'string' && allowedBackgrounds.has(value) ? value : undefined),
     z.string().default(defaultBackground),
   ),
-})
+});
 
 export const Route = createFileRoute('/embed')({
   validateSearch: embedSearchSchema,
   component: EmbedRouteComponent,
-})
+});
 
 function EmbedRouteComponent() {
-  const hydrated = useHydrated()
-  const { url, model, background } = Route.useSearch()
-  const { xml, assetUrls, loadFromUrl, clearBundle } = useMaterialXBundleState()
-  const compileState = useMaterialXCompile({ xml, assetUrls, hydrated })
-  const { selectedBackground, backgroundError, backgroundCompileState, onBackgroundChange } = useMaterialXBackground(hydrated, background)
-  useViewerTestInstrumentation(true, hydrated)
+  const hydrated = useHydrated();
+  const { url, model, background } = Route.useSearch();
+  const { xml, assetUrls, loadFromUrl, clearBundle } = useMaterialXBundleState();
+  const compileState = useMaterialXCompile({ xml, assetUrls, hydrated });
+  const { selectedBackground, backgroundError, backgroundCompileState, onBackgroundChange } = useMaterialXBackground(
+    hydrated,
+    background,
+  );
+  useViewerTestInstrumentation(true, hydrated);
 
   useEffect(() => {
     const load = async () => {
       if (!url) {
-        clearBundle()
-        return
+        clearBundle();
+        return;
       }
       try {
-        await loadFromUrl(url)
+        await loadFromUrl(url);
       } catch (error) {
-        clearBundle()
-        console.error('Failed to load embed material:', error)
+        clearBundle();
+        console.error('Failed to load embed material:', error);
       }
-    }
+    };
 
-    void load()
-  }, [clearBundle, loadFromUrl, url])
+    void load();
+  }, [clearBundle, loadFromUrl, url]);
 
   useEffect(() => {
-    void onBackgroundChange(background)
-  }, [background, onBackgroundChange])
+    void onBackgroundChange(background);
+  }, [background, onBackgroundChange]);
 
-  const warningCount = compileState.result?.warnings.length ?? 0
-  const unsupportedCategoryCount = compileState.result?.unsupportedCategories.length ?? 0
-  const unsupportedWarningCount = (compileState.result?.warnings ?? []).filter((warning) => warning.code === 'unsupported-node').length
+  const warningCount = compileState.result?.warnings.length ?? 0;
+  const unsupportedCategoryCount = compileState.result?.unsupportedCategories.length ?? 0;
+  const unsupportedWarningCount = (compileState.result?.warnings ?? []).filter(
+    (warning) => warning.code === 'unsupported-node',
+  ).length;
   const statusMessage = useMemo(() => {
     if (!url) {
-      return 'Missing "url" query parameter'
+      return 'Missing "url" query parameter';
     }
     if (!xml.trim()) {
-      return 'Loading material...'
+      return 'Loading material...';
     }
-    return 'Embed route active'
-  }, [url, xml])
+    return 'Embed route active';
+  }, [url, xml]);
 
   return (
     <div className="h-full w-full">
@@ -110,5 +115,5 @@ function EmbedRouteComponent() {
         <p data-testid="active-source-label">{url ?? 'n/a'}</p>
       </div>
     </div>
-  )
+  );
 }

@@ -1,24 +1,11 @@
 #!/usr/bin/env node
 
 import { execSync } from 'node:child_process';
-import {
-  cpSync,
-  existsSync,
-  mkdirSync,
-  readdirSync,
-  readFileSync,
-  rmSync,
-  statSync,
-  writeFileSync,
-} from 'node:fs';
+import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-type DependencyField =
-  | 'dependencies'
-  | 'devDependencies'
-  | 'peerDependencies'
-  | 'optionalDependencies';
+type DependencyField = 'dependencies' | 'devDependencies' | 'peerDependencies' | 'optionalDependencies';
 
 type PackageJson = {
   name?: string;
@@ -104,9 +91,7 @@ function main(): void {
 
 function parseArgs(args: string[]): { packagePath: string; dryRun: boolean } {
   if (args.length === 0) {
-    throw new Error(
-      'Package path is required. Usage: node scripts/src/make-release.ts <package-path> [--dry-run]',
-    );
+    throw new Error('Package path is required. Usage: node scripts/src/make-release.ts <package-path> [--dry-run]');
   }
 
   const dryRun = args.includes('--dry-run');

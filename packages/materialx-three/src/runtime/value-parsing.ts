@@ -21,7 +21,7 @@ export const parseVector2Value = (value: string | undefined, fallback: [number, 
 
 export const parseVector3Value = (
   value: string | undefined,
-  fallback: [number, number, number] = [0, 0, 0]
+  fallback: [number, number, number] = [0, 0, 0],
 ): [number, number, number] => {
   const parsed = parseList(value);
   return [parsed[0] ?? fallback[0], parsed[1] ?? fallback[1], parsed[2] ?? fallback[2]];
@@ -29,7 +29,7 @@ export const parseVector3Value = (
 
 export const parseVector4Value = (
   value: string | undefined,
-  fallback: [number, number, number, number] = [0, 0, 0, 1]
+  fallback: [number, number, number, number] = [0, 0, 0, 1],
 ): [number, number, number, number] => {
   const parsed = parseList(value);
   return [parsed[0] ?? fallback[0], parsed[1] ?? fallback[1], parsed[2] ?? fallback[2], parsed[3] ?? fallback[3]];

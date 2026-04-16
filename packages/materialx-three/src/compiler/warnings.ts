@@ -31,7 +31,7 @@ export const toScalar = (value: unknown): number | undefined => {
 const warnIgnoredSurfaceInputs = (
   surfaceNode: MaterialXNode,
   mappedInputs: ReadonlySet<string>,
-  context: CompileContext
+  context: CompileContext,
 ): void => {
   const authoredInputs = [...new Set(surfaceNode.inputs.map((input) => input.name))];
   for (const inputName of authoredInputs) {

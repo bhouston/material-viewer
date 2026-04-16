@@ -1,27 +1,27 @@
-import { useCallback, useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef } from 'react';
 
 export const useObjectUrlStore = () => {
-  const objectUrlsRef = useRef<string[]>([])
+  const objectUrlsRef = useRef<string[]>([]);
 
   const replaceObjectUrls = useCallback((nextObjectUrls: string[]) => {
     for (const objectUrl of objectUrlsRef.current) {
-      URL.revokeObjectURL(objectUrl)
+      URL.revokeObjectURL(objectUrl);
     }
-    objectUrlsRef.current = nextObjectUrls
-  }, [])
+    objectUrlsRef.current = nextObjectUrls;
+  }, []);
 
   const clearObjectUrls = useCallback(() => {
-    replaceObjectUrls([])
-  }, [replaceObjectUrls])
+    replaceObjectUrls([]);
+  }, [replaceObjectUrls]);
 
   useEffect(() => {
     return () => {
       for (const objectUrl of objectUrlsRef.current) {
-        URL.revokeObjectURL(objectUrl)
+        URL.revokeObjectURL(objectUrl);
       }
-      objectUrlsRef.current = []
-    }
-  }, [])
+      objectUrlsRef.current = [];
+    };
+  }, []);
 
-  return { replaceObjectUrls, clearObjectUrls }
-}
+  return { replaceObjectUrls, clearObjectUrls };
+};
