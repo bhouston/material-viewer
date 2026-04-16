@@ -81,9 +81,15 @@ function EmbedRouteComponent() {
     }
     return 'Embed route active';
   }, [url, xml]);
+  const homeHref = useMemo(() => {
+    if (!url) {
+      return '/';
+    }
+    return `/?material=${encodeURIComponent(url)}`;
+  }, [url]);
 
   return (
-    <div className="h-full w-full">
+    <div className="relative h-full w-full">
       <div className="h-full w-full" data-testid="drop-message">
         <MaterialViewport
           backgroundError={backgroundError ?? backgroundCompileState.error}
@@ -101,6 +107,26 @@ function EmbedRouteComponent() {
           variant="bare"
           viewerClassName="h-full w-full overflow-hidden bg-background"
         />
+      </div>
+      <div className="pointer-events-none absolute inset-0 z-10">
+        <div className="absolute left-4 top-4">
+          <a
+            className="pointer-events-auto text-2xl font-bold text-foreground drop-shadow-sm transition-opacity hover:opacity-85"
+            href={homeHref}
+          >
+            MaterialX Viewer
+          </a>
+        </div>
+        {url ? (
+          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 px-4">
+            <a
+              className="pointer-events-auto block text-center text-base text-foreground/90 drop-shadow-sm transition-opacity hover:opacity-85"
+              href={homeHref}
+            >
+              {url}
+            </a>
+          </div>
+        ) : null}
       </div>
       <div
         className="sr-only"
