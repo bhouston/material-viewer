@@ -23,6 +23,11 @@ const embedSearchSchema = z.object({
     (value) => (typeof value === 'string' && allowedBackgrounds.has(value) ? value : undefined),
     z.string().default(defaultBackground),
   ),
+  static: z.preprocess((value) => {
+    if (value === true || value === 'true' || value === '1') return true;
+    if (value === false || value === 'false' || value === '0' || value === undefined) return false;
+    return undefined;
+  }, z.boolean().default(false)),
 });
 
 export const Route = createFileRoute('/embed')({
@@ -32,7 +37,7 @@ export const Route = createFileRoute('/embed')({
 
 function EmbedRouteComponent() {
   const hydrated = useHydrated();
-  const { url, model, background } = Route.useSearch();
+  const { url, model, background, static: staticPreview } = Route.useSearch();
   const { xml, assetUrls, loadFromUrl, clearBundle } = useMaterialXBundleState();
   const compileState = useMaterialXCompile({ xml, assetUrls, hydrated });
   const { selectedBackground, backgroundError, backgroundCompileState, onBackgroundChange } = useMaterialXBackground(
@@ -84,8 +89,9 @@ function EmbedRouteComponent() {
           backgroundError={backgroundError ?? backgroundCompileState.error}
           backgroundMaterial={backgroundCompileState.material}
           backgroundPacks={materialXBackgroundPacks}
-          enableOrbitControls={false}
+          enableOrbitControls
           initialPreviewGeometry={model}
+          idleAutoRotate={!staticPreview}
           lockBackground
           lockPreviewGeometry
           nodeMaterial={compileState.material}

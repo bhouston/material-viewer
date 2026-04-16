@@ -18,6 +18,7 @@ interface ViewerProps {
   previewGeometry: PreviewGeometry;
   fixedSize?: number;
   enableControls?: boolean;
+  idleAutoRotate?: boolean;
   viewportClassName?: string;
   onRendererLabelChange: (label: string) => void;
   onPreviewGeometryErrorChange: (message?: string) => void;
@@ -33,6 +34,7 @@ const Viewer = forwardRef<ViewerHandle, ViewerProps>(function ViewerImpl(
     previewGeometry,
     fixedSize,
     enableControls = true,
+    idleAutoRotate = true,
     viewportClassName,
     onRendererLabelChange,
     onPreviewGeometryErrorChange,
@@ -108,6 +110,7 @@ const Viewer = forwardRef<ViewerHandle, ViewerProps>(function ViewerImpl(
         <ViewerScene
           backgroundMaterial={backgroundMaterial}
           enableControls={enableControls}
+          idleAutoRotate={idleAutoRotate}
           nodeMaterial={nodeMaterial}
           onCameraReady={setCameraRef}
           onControlsReady={setControlsRef}

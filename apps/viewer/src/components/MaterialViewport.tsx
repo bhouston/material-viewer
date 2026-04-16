@@ -22,6 +22,7 @@ interface MaterialViewportProps {
   lockBackground?: boolean;
   showControls?: boolean;
   enableOrbitControls?: boolean;
+  idleAutoRotate?: boolean;
   variant?: 'panel' | 'bare';
   viewerClassName?: string;
   viewerFixedSize?: number;
@@ -40,6 +41,7 @@ export default function MaterialViewport({
   lockBackground = false,
   showControls = true,
   enableOrbitControls = showControls,
+  idleAutoRotate = true,
   variant = 'panel',
   viewerClassName,
   viewerFixedSize,
@@ -84,6 +86,7 @@ export default function MaterialViewport({
         backgroundMaterial={backgroundMaterial}
         enableControls={enableOrbitControls}
         fixedSize={viewerFixedSize}
+        idleAutoRotate={idleAutoRotate}
         nodeMaterial={nodeMaterial}
         onPreviewGeometryErrorChange={setPreviewGeometryError}
         onPreviewGeometryFallback={handlePreviewGeometryChange}

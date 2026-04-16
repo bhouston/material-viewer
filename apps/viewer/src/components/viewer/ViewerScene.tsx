@@ -1,5 +1,5 @@
 import { OrbitControls } from '@react-three/drei';
-import { useThree } from '@react-three/fiber';
+import { useFrame, useThree } from '@react-three/fiber';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   BackSide,
@@ -7,10 +7,12 @@ import {
   EquirectangularReflectionMapping,
   Mesh,
   MeshStandardMaterial,
+  Spherical,
   SphereGeometry,
   type Group,
   type Material,
   type PerspectiveCamera,
+  Vector3,
 } from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { HDRLoader } from 'three/addons/loaders/HDRLoader.js';
@@ -34,11 +36,15 @@ interface ViewerSceneProps {
   nodeMaterial?: MeshPhysicalNodeMaterial;
   backgroundMaterial?: MeshPhysicalNodeMaterial;
   enableControls: boolean;
+  idleAutoRotate: boolean;
   onCameraReady: (camera: PerspectiveCamera | null) => void;
   onControlsReady: (controls: OrbitControlsImpl | null) => void;
   onPreviewGeometryErrorChange: (message?: string) => void;
   onPreviewGeometryFallback: (geometry: PreviewGeometry) => void;
 }
+
+const AUTO_SWAY_AMPLITUDE = Math.PI / 4;
+const AUTO_SWAY_SPEED = 0.4;
 
 function TotemMesh({
   visible,
@@ -163,12 +169,18 @@ export function ViewerScene({
   nodeMaterial,
   backgroundMaterial,
   enableControls,
+  idleAutoRotate,
   onCameraReady,
   onControlsReady,
   onPreviewGeometryErrorChange,
   onPreviewGeometryFallback,
 }: ViewerSceneProps) {
   const { camera, scene } = useThree();
+  const [controls, setControls] = useState<OrbitControlsImpl | null>(null);
+  const isInteractingRef = useRef(false);
+  const hasUserInteractedRef = useRef(false);
+  const autoSphericalRef = useRef(new Spherical());
+  const autoOffsetRef = useRef(new Vector3());
 
   const sphereGeometry = useMemo(() => new SphereGeometry(0.9, 96, 96), []);
   const cubeGeometry = useMemo(() => new BoxGeometry(1.45, 1.45, 1.45), []);
@@ -260,6 +272,7 @@ export function ViewerScene({
 
   const setControlsRef = useCallback(
     (controls: OrbitControlsImpl | null) => {
+      setControls(controls);
       onControlsReady(controls);
     },
     [onControlsReady],
@@ -270,6 +283,56 @@ export function ViewerScene({
       onControlsReady(null);
     }
   }, [enableControls, onControlsReady]);
+
+  useEffect(() => {
+    if (!controls) {
+      return;
+    }
+
+    const markInteractionStart = () => {
+      isInteractingRef.current = true;
+      hasUserInteractedRef.current = true;
+    };
+
+    const markInteractionEnd = () => {
+      isInteractingRef.current = false;
+      hasUserInteractedRef.current = true;
+    };
+
+    const domElement = controls.domElement;
+    controls.addEventListener('start', markInteractionStart);
+    controls.addEventListener('end', markInteractionEnd);
+    domElement.addEventListener('wheel', markInteractionEnd, { passive: true });
+
+    return () => {
+      controls.removeEventListener('start', markInteractionStart);
+      controls.removeEventListener('end', markInteractionEnd);
+      domElement.removeEventListener('wheel', markInteractionEnd);
+    };
+  }, [controls]);
+
+  useFrame(({ clock }) => {
+    if (!enableControls || !idleAutoRotate || !controls || isInteractingRef.current || hasUserInteractedRef.current) {
+      return;
+    }
+
+    const elapsed = clock.getElapsedTime();
+    const phase = elapsed;
+    const targetAzimuth = AUTO_SWAY_AMPLITUDE * Math.sin(phase * AUTO_SWAY_SPEED);
+    const offset = autoOffsetRef.current;
+    const spherical = autoSphericalRef.current;
+    offset.copy(controls.object.position).sub(controls.target);
+    spherical.setFromVector3(offset);
+    const nextAzimuth = spherical.theta + (targetAzimuth - spherical.theta) * 0.06;
+    if (Math.abs(nextAzimuth - spherical.theta) < 0.0001) {
+      return;
+    }
+
+    spherical.theta = nextAzimuth;
+    offset.setFromSpherical(spherical);
+    controls.object.position.copy(controls.target).add(offset);
+    controls.update();
+  });
 
   const activeMaterial = nodeMaterial ?? defaultMaterial;
 
