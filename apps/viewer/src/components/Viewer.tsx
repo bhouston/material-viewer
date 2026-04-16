@@ -2,6 +2,7 @@ import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react';
 import {
   AmbientLight,
   BackSide,
+  type BufferGeometry,
   Box3,
   BoxGeometry,
   DirectionalLight,
@@ -19,6 +20,8 @@ import type { Group } from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { HDRLoader } from 'three/addons/loaders/HDRLoader.js';
+import * as MikkTSpace from 'three/addons/libs/mikktspace.module.js';
+import { computeMikkTSpaceTangents } from 'three/addons/utils/BufferGeometryUtils.js';
 import type { MeshPhysicalNodeMaterial } from 'three/webgpu';
 
 export type PreviewGeometry = 'totem' | 'sphere' | 'cube' | 'plane';
@@ -40,8 +43,26 @@ interface ViewerProps {
 
 const ENV_MAP_URL = 'https://api.landofassets.com/media/BenHouston3D/Samples/PaulLobeHaus/image/hdr';
 const DEFAULT_CAMERA_POSITION = { x: 0, y: 0, z: 3.2 };
-const TOTEM_MODEL_URL = '/models/ShaderBall.glb';
+const TOTEM_MODEL_URL = '/models/totem.glb';
 const PREVIEW_TARGET_SIZE = 1.8;
+
+const ensureTangents = async (geometry: BufferGeometry): Promise<boolean> => {
+  if (geometry.getAttribute('tangent')) {
+    return true;
+  }
+  if (!geometry.getAttribute('position') || !geometry.getAttribute('normal') || !geometry.getAttribute('uv')) {
+    return false;
+  }
+  try {
+    await MikkTSpace.ready;
+    computeMikkTSpaceTangents(geometry, MikkTSpace);
+    return true;
+  } catch (error) {
+    // Keep rendering if tangent generation fails for a geometry.
+    console.warn('Failed to compute tangents for preview geometry', error);
+    return false;
+  }
+};
 
 const createUvPlaneGeometry = (size: number) => {
   const geometry = new PlaneGeometry(size, size, 1, 1);
@@ -158,10 +179,17 @@ const Viewer = forwardRef<ViewerHandle, ViewerProps>(function ViewerImpl(
       camera.lookAt(0, 0, 0);
       cameraRef.current = camera;
 
+      const sphereGeometry = new SphereGeometry(0.9, 96, 96);
+      const cubeGeometry = new BoxGeometry(1.45, 1.45, 1.45);
+      const planeGeometry = createUvPlaneGeometry(PREVIEW_TARGET_SIZE);
+      await ensureTangents(sphereGeometry);
+      await ensureTangents(cubeGeometry);
+      await ensureTangents(planeGeometry);
+
       const defaultMaterial = new MeshStandardMaterial({ color: 0xc5d4db, metalness: 0, roughness: 0.5 });
-      const sphere = new Mesh(new SphereGeometry(0.9, 96, 96), defaultMaterial);
-      const cube = new Mesh(new BoxGeometry(1.45, 1.45, 1.45), defaultMaterial);
-      const plane = new Mesh(createUvPlaneGeometry(PREVIEW_TARGET_SIZE), defaultMaterial);
+      const sphere = new Mesh(sphereGeometry, defaultMaterial);
+      const cube = new Mesh(cubeGeometry, defaultMaterial);
+      const plane = new Mesh(planeGeometry, defaultMaterial);
       defaultMaterialRef.current = defaultMaterial;
       materialSphereRef.current = sphere;
       materialCubeRef.current = cube;
@@ -184,6 +212,16 @@ const Viewer = forwardRef<ViewerHandle, ViewerProps>(function ViewerImpl(
             allMeshes.push(entry as Mesh);
           }
         });
+        const totemGeometries = new Set<BufferGeometry>();
+        for (const mesh of allMeshes) {
+          const geometry = mesh.geometry;
+          if (geometry) {
+            totemGeometries.add(geometry);
+          }
+        }
+        for (const geometry of totemGeometries) {
+          void (await ensureTangents(geometry));
+        }
         const namedMeshes = allMeshes.filter(
           (mesh) => mesh.name === 'Calibration_Mesh' || mesh.name === 'Preview_Mesh',
         );

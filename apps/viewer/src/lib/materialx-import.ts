@@ -3,6 +3,26 @@ import JSZip from 'jszip';
 const isMaterialXFile = (name: string): boolean => name.toLowerCase().endsWith('.mtlx');
 const isZipFile = (name: string): boolean => name.toLowerCase().endsWith('.zip');
 
+const extensionToMimeType: Record<string, string> = {
+  avif: 'image/avif',
+  exr: 'image/x-exr',
+  gif: 'image/gif',
+  hdr: 'image/vnd.radiance',
+  jpeg: 'image/jpeg',
+  jpg: 'image/jpeg',
+  png: 'image/png',
+  svg: 'image/svg+xml',
+  tif: 'image/tiff',
+  tiff: 'image/tiff',
+  webp: 'image/webp',
+};
+
+const guessMimeType = (path: string): string | undefined => {
+  const basename = path.includes('/') ? path.substring(path.lastIndexOf('/') + 1) : path;
+  const extension = basename.includes('.') ? basename.substring(basename.lastIndexOf('.') + 1).toLowerCase() : '';
+  return extensionToMimeType[extension];
+};
+
 const makeAssetKeys = (file: File): string[] => {
   const keys = new Set<string>();
   keys.add(file.name);
@@ -54,7 +74,9 @@ const importFromZipBuffer = async (buffer: ArrayBuffer, label: string): Promise<
     if (path === mtlxPath) continue;
 
     const data = await file.async('arraybuffer');
-    const blob = new Blob([data]);
+    const blob = new Blob([data], {
+      type: guessMimeType(path),
+    });
     const objectUrl = URL.createObjectURL(blob);
     objectUrls.push(objectUrl);
 

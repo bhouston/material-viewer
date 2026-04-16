@@ -1,4 +1,4 @@
-import { HeadContent, Scripts, createRootRoute, useRouterState } from '@tanstack/react-router';
+import { HeadContent, Link, Scripts, createRootRoute, useRouterState } from '@tanstack/react-router';
 import Footer from '../components/Footer';
 import Header from '../components/Header';
 
@@ -25,6 +25,7 @@ export const Route = createRootRoute({
       },
     ],
   }),
+  notFoundComponent: ViewerNotFound,
   shellComponent: RootDocument,
 });
 
@@ -51,5 +52,24 @@ function RootDocument({ children }: { children: React.ReactNode }) {
         <Scripts />
       </body>
     </html>
+  );
+}
+
+function ViewerNotFound() {
+  return (
+    <div className="page-wrap flex min-h-[50vh] flex-col items-center justify-center gap-4 py-12 text-center">
+      <p className="text-xs font-semibold tracking-[0.16em] text-muted-foreground uppercase">404</p>
+      <h1 className="text-3xl font-semibold tracking-tight text-foreground">Page not found</h1>
+      <p className="max-w-lg text-sm text-muted-foreground">
+        This viewer route does not exist. Go back to the MaterialX viewer home page to load a material.
+      </p>
+      <Link
+        className="inline-flex h-9 items-center justify-center rounded-md border border-border bg-card px-4 text-sm font-medium text-foreground no-underline transition-colors hover:bg-muted/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+        search={{ material: undefined }}
+        to="/"
+      >
+        Back to viewer
+      </Link>
+    </div>
   );
 }
