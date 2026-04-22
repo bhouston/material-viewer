@@ -1,5 +1,5 @@
 import type { MaterialXNode } from '@materialx-js/materialx';
-import { div, max, mul } from 'three/tsl';
+import { div, max, mul, pow } from 'three/tsl';
 import type { MaterialSlotAssignments } from '../types.js';
 
 export interface OpenPbrSurfaceInputs {
@@ -37,6 +37,28 @@ const toGltfDispersion = (abbeNumber: unknown, dispersionScale: unknown): unknow
   return mul(dispersionScale as never, div(20 as never, safeAbbeNumber as never));
 };
 
+const hasNodeValue = (value: unknown): boolean => value !== undefined && value !== null;
+
+const multiplyNodeValues = (left: unknown, right: unknown): unknown =>
+  (left as { mul?: (other: unknown) => unknown }).mul?.(right) ?? mul(left as never, right as never);
+
+const applyThinWalledThickness = (thinWalled: unknown, transmissionDepth: unknown): unknown => {
+  if (!hasNodeValue(transmissionDepth)) {
+    return undefined;
+  }
+  if (!hasNodeValue(thinWalled)) {
+    return transmissionDepth;
+  }
+  if (typeof thinWalled === 'boolean') {
+    return thinWalled ? 0 : transmissionDepth;
+  }
+  const select = (thinWalled as { select?: (whenTrue: unknown, whenFalse: unknown) => unknown }).select;
+  if (typeof select === 'function') {
+    return select(0, transmissionDepth);
+  }
+  return transmissionDepth;
+};
+
 export const buildOpenPbrSurfaceAssignments = (
   surfaceNode: MaterialXNode,
   helpers: OpenPbrSurfaceInputs,
@@ -50,17 +72,19 @@ export const buildOpenPbrSurfaceAssignments = (
   const specularColor = helpers.getInputNode(surfaceNode, 'specular_color', [1, 1, 1]);
   const anisotropy = helpers.getInputNode(surfaceNode, 'specular_roughness_anisotropy', 0);
   const coat = helpers.getInputNode(surfaceNode, 'coat_weight', 0);
+  const coatColor = helpers.getInputNode(surfaceNode, 'coat_color', [1, 1, 1]);
   const coatRoughness = helpers.getInputNode(surfaceNode, 'coat_roughness', 0);
   const coatNormal = helpers.getInputNode(surfaceNode, 'geometry_coat_normal', undefined);
   const fuzz = helpers.getInputNode(surfaceNode, 'fuzz_weight', 0);
   const fuzzColor = helpers.getInputNode(surfaceNode, 'fuzz_color', [1, 1, 1]);
   const fuzzRoughness = helpers.getInputNode(surfaceNode, 'fuzz_roughness', 0.5);
   const transmission = helpers.getInputNode(surfaceNode, 'transmission_weight', 0);
-  const transmissionColor = hasInput('transmission_color')
-    ? helpers.getInputNode(surfaceNode, 'transmission_color', [1, 1, 1])
-    : undefined;
+  const transmissionColor = helpers.getInputNode(surfaceNode, 'transmission_color', [1, 1, 1]);
   const transmissionDepth = hasInput('transmission_depth')
     ? helpers.getInputNode(surfaceNode, 'transmission_depth', undefined)
+    : undefined;
+  const geometryThinWalled = hasInput('geometry_thin_walled')
+    ? helpers.getInputNode(surfaceNode, 'geometry_thin_walled', undefined)
     : undefined;
   const hasTransmissionDispersionScale = hasInput('transmission_dispersion_scale');
   const hasTransmissionDispersionAbbe = hasInput('transmission_dispersion_abbe_number');
@@ -71,24 +95,28 @@ export const buildOpenPbrSurfaceAssignments = (
           helpers.getInputNode(surfaceNode, 'transmission_dispersion_scale', 0),
         )
       : undefined;
-  const ior = helpers.getInputNode(surfaceNode, 'specular_ior', 1.5);
+  const ior = hasInput('specular_ior')
+    ? helpers.getInputNode(surfaceNode, 'specular_ior', 1.5)
+    : helpers.getInputNode(surfaceNode, 'specular_ior_level', 1.5);
   const normal = helpers.getInputNode(surfaceNode, 'geometry_normal', undefined);
-  const opacity = helpers.getInputNode(surfaceNode, 'geometry_opacity', undefined);
+  const opacity = helpers.getInputNode(surfaceNode, 'geometry_opacity', 1);
   const thinFilmWeight = helpers.getInputNode(surfaceNode, 'thin_film_weight', 0);
   const thinFilmThicknessMicrometers = helpers.getInputNode(surfaceNode, 'thin_film_thickness', 0);
   const thinFilmIor = helpers.getInputNode(surfaceNode, 'thin_film_ior', 1.4);
   const emissionColor = helpers.getInputNode(surfaceNode, 'emission_color', [1, 1, 1]);
   const emissionLuminance = helpers.getInputNode(surfaceNode, 'emission_luminance', 0);
 
-  const colorNode =
-    (baseColor as { mul?: (other: unknown) => unknown }).mul?.(baseWeight) ??
-    mul(baseColor as never, baseWeight as never);
+  const colorNode = multiplyNodeValues(multiplyNodeValues(baseColor, baseWeight), coatColor);
   const sheenNode =
     (fuzzColor as { mul?: (other: unknown) => unknown }).mul?.(fuzz) ?? mul(fuzzColor as never, fuzz as never);
+  const sheenRoughnessNode =
+    typeof fuzzRoughness === 'number' ? Math.pow(fuzzRoughness, 2.5) : pow(fuzzRoughness as never, 2.5 as never);
   const emissiveNode =
     (emissionColor as { mul?: (other: unknown) => unknown }).mul?.(emissionLuminance) ??
     mul(emissionColor as never, emissionLuminance as never);
   const thinFilmThicknessNanometers = mul(thinFilmThicknessMicrometers as never, 1000 as never);
+
+  const thicknessNode = applyThinWalledThickness(geometryThinWalled, transmissionDepth);
 
   return {
     colorNode,
@@ -102,11 +130,11 @@ export const buildOpenPbrSurfaceAssignments = (
     clearcoatRoughnessNode: coatRoughness,
     clearcoatNormalNode: coatNormal,
     sheenNode,
-    sheenRoughnessNode: fuzzRoughness,
+    sheenRoughnessNode,
     emissiveNode,
     opacityNode: opacity,
     transmissionNode: transmission,
-    thicknessNode: transmissionDepth,
+    thicknessNode,
     dispersionNode: dispersion,
     attenuationColorNode: transmissionColor,
     attenuationDistanceNode: transmissionDepth,

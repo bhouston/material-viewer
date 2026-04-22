@@ -48,32 +48,20 @@ export const buildGltfPbrSurfaceAssignments = (
   const metallic = helpers.getInputNode(surfaceNode, 'metallic', 1);
   const normal = helpers.getInputNode(surfaceNode, 'normal', undefined);
   const transmission = hasInput('transmission') ? helpers.getInputNode(surfaceNode, 'transmission', 0) : undefined;
-  const specular = hasInput('specular') ? helpers.getInputNode(surfaceNode, 'specular', 1) : undefined;
-  const specularColor = hasInput('specular_color')
-    ? helpers.getInputNode(surfaceNode, 'specular_color', [1, 1, 1])
-    : undefined;
-  const ior = hasInput('ior') ? helpers.getInputNode(surfaceNode, 'ior', 1.5) : undefined;
+  const specular = helpers.getInputNode(surfaceNode, 'specular', 1);
+  const specularColor = helpers.getInputNode(surfaceNode, 'specular_color', [1, 1, 1]);
+  const ior = helpers.getInputNode(surfaceNode, 'ior', 1.5);
   const alpha = helpers.getInputNode(surfaceNode, 'alpha', 1);
   const alphaMode = helpers.getInputNode(surfaceNode, 'alpha_mode', 0);
   const alphaCutoff = helpers.getInputNode(surfaceNode, 'alpha_cutoff', 0.5);
-  const iridescence = hasInput('iridescence') ? helpers.getInputNode(surfaceNode, 'iridescence', 0) : undefined;
-  const iridescenceIor = hasInput('iridescence_ior')
-    ? helpers.getInputNode(surfaceNode, 'iridescence_ior', 1.3)
-    : undefined;
-  const iridescenceThickness = hasInput('iridescence_thickness')
-    ? helpers.getInputNode(surfaceNode, 'iridescence_thickness', 300)
-    : undefined;
-  const sheenColor = hasInput('sheen_color') ? helpers.getInputNode(surfaceNode, 'sheen_color', [0, 0, 0]) : undefined;
-  const sheenRoughness = hasInput('sheen_roughness')
-    ? helpers.getInputNode(surfaceNode, 'sheen_roughness', 0)
-    : undefined;
-  const clearcoat = hasInput('clearcoat') ? helpers.getInputNode(surfaceNode, 'clearcoat', 0) : undefined;
-  const clearcoatRoughness = hasInput('clearcoat_roughness')
-    ? helpers.getInputNode(surfaceNode, 'clearcoat_roughness', 0)
-    : undefined;
-  const clearcoatNormal = hasInput('clearcoat_normal')
-    ? helpers.getInputNode(surfaceNode, 'clearcoat_normal', undefined)
-    : undefined;
+  const iridescence = helpers.getInputNode(surfaceNode, 'iridescence', 0);
+  const iridescenceIor = helpers.getInputNode(surfaceNode, 'iridescence_ior', 1.3);
+  const iridescenceThickness = helpers.getInputNode(surfaceNode, 'iridescence_thickness', 100);
+  const sheenColor = helpers.getInputNode(surfaceNode, 'sheen_color', [0, 0, 0]);
+  const sheenRoughness = helpers.getInputNode(surfaceNode, 'sheen_roughness', 0);
+  const clearcoat = helpers.getInputNode(surfaceNode, 'clearcoat', 0);
+  const clearcoatRoughness = helpers.getInputNode(surfaceNode, 'clearcoat_roughness', 0);
+  const clearcoatNormal = helpers.getInputNode(surfaceNode, 'clearcoat_normal', undefined);
   const emissiveColor = helpers.getInputNode(surfaceNode, 'emissive', [0, 0, 0]);
   const emissiveStrength = helpers.getInputNode(surfaceNode, 'emissive_strength', 1);
   const attenuationDistance = hasInput('attenuation_distance')
@@ -109,6 +97,7 @@ export const buildGltfPbrSurfaceAssignments = (
     clearcoatRoughnessNode: clearcoatRoughness,
     clearcoatNormalNode: clearcoatNormal,
     sheenNode: sheenColor,
+    sheenColorNode: sheenColor,
     sheenRoughnessNode: sheenRoughness,
     normalNode: normal,
     emissiveNode,

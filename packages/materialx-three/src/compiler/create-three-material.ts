@@ -1,7 +1,7 @@
 import type { MaterialXDocument } from '@materialx-js/materialx';
 import { Color } from 'three';
 import { cos, float, mul, sin, vec2 } from 'three/tsl';
-import { MeshPhysicalNodeMaterial } from 'three/webgpu';
+import { DoubleSide, MeshPhysicalNodeMaterial } from 'three/webgpu';
 import type { MaterialXThreeCompileOptions, MaterialXThreeCompileResult } from '../types.js';
 import { compileMaterialXToTSL } from './compile-material.js';
 
@@ -33,10 +33,13 @@ export const createThreeMaterialFromDocument = (
   const transmissionAssignment = result.assignments.transmissionNode;
   const opacityLiteral = readNumberLiteral(opacityAssignment);
   const transmissionLiteral = readNumberLiteral(transmissionAssignment);
-  const hasTransmission =
-    transmissionAssignment !== undefined && (transmissionLiteral === undefined ? true : transmissionLiteral > 0.0001);
+  const hasTransmission = transmissionAssignment !== undefined;
   const hasFractionalOpacity =
     opacityAssignment !== undefined && (opacityLiteral === undefined ? true : opacityLiteral < 0.9999);
+  const materialWithExtraNodes = material as MeshPhysicalNodeMaterial & {
+    sheenColorNode?: unknown;
+    transmissionColorNode?: unknown;
+  };
 
   material.color = new Color(1, 1, 1);
   material.colorNode = result.assignments.colorNode as never;
@@ -77,6 +80,7 @@ export const createThreeMaterialFromDocument = (
   material.clearcoatRoughnessNode = result.assignments.clearcoatRoughnessNode as never;
   material.clearcoatNormalNode = result.assignments.clearcoatNormalNode as never;
   material.sheenNode = result.assignments.sheenNode as never;
+  materialWithExtraNodes.sheenColorNode = result.assignments.sheenColorNode as never;
   material.sheenRoughnessNode = result.assignments.sheenRoughnessNode as never;
   material.normalNode = result.assignments.normalNode as never;
   material.emissiveNode = result.assignments.emissiveNode as never;
@@ -96,11 +100,14 @@ export const createThreeMaterialFromDocument = (
   if (hasTransmission) {
     // Keep the non-node scalar enabled so Three routes the material through
     // its transmission render path in both WebGL and WebGPU backends.
+    material.side = DoubleSide;
     material.transmission = transmissionLiteral ?? 1;
     material.opacity = 1;
   } else if (opacityLiteral !== undefined) {
     material.opacity = opacityLiteral;
   }
+  materialWithExtraNodes.transmissionColorNode =
+    (result.assignments.transmissionColorNode ?? result.assignments.attenuationColorNode) as never;
   material.attenuationColorNode = result.assignments.attenuationColorNode as never;
   material.attenuationDistanceNode = result.assignments.attenuationDistanceNode as never;
   material.iorNode = result.assignments.iorNode as never;

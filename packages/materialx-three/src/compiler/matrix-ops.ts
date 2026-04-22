@@ -7,16 +7,16 @@ export const outputNameToChannelIndex = (outputName?: string): number => {
     return 0;
   }
   const normalized = outputName.toLowerCase();
-  if (normalized.endsWith('x') || normalized.endsWith('r')) {
+  if (normalized === 'outx' || normalized === 'outr' || normalized === 'r') {
     return 0;
   }
-  if (normalized.endsWith('y') || normalized.endsWith('g')) {
+  if (normalized === 'outy' || normalized === 'outg' || normalized === 'g') {
     return 1;
   }
-  if (normalized.endsWith('z') || normalized.endsWith('b')) {
+  if (normalized === 'outz' || normalized === 'outb' || normalized === 'b') {
     return 2;
   }
-  if (normalized.endsWith('w') || normalized.endsWith('a')) {
+  if (normalized === 'outw' || normalized === 'outa' || normalized === 'a') {
     return 3;
   }
   return 0;

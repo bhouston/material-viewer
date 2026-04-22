@@ -40,8 +40,6 @@ import {
   mx_ramplr,
   mx_ramptb,
   mx_rgbtohsv,
-  mx_rotate2d,
-  mx_rotate3d,
   mx_splitlr,
   mx_splittb,
   mx_timer,
@@ -781,16 +779,59 @@ export const buildNodeHandlerRegistry = (deps: NodeHandlerDeps): Map<string, Nod
   map.set('rotate2d', (node, context, scopeGraph) => {
     const inNode = r(node, 'in', vec2(0, 0), context, scopeGraph);
     const amount = r(node, 'amount', 0, context, scopeGraph);
-    const pivot = r(node, 'pivot', vec2(0.5, 0.5), context, scopeGraph);
-    const centered = sub(inNode as never, pivot as never);
-    return add(mx_rotate2d(centered as never, amount as never) as never, pivot as never);
+    const rotationRadians = mul(amount as never, float(Math.PI / 180.0) as never);
+    const sa = sin(rotationRadians as never);
+    const ca = cos(rotationRadians as never);
+    const x = getNodeChannel(inNode, 0);
+    const y = getNodeChannel(inNode, 1);
+    return vec2(
+      add(mul(ca as never, x as never) as never, mul(sa as never, y as never) as never),
+      sub(mul(ca as never, y as never) as never, mul(sa as never, x as never) as never),
+    );
   });
 
   map.set('rotate3d', (node, context, scopeGraph) => {
     const inNode = r(node, 'in', vec3(0, 0, 0), context, scopeGraph);
     const amount = r(node, 'amount', 0, context, scopeGraph);
-    const axis = r(node, 'axis', vec3(0, 0, 1), context, scopeGraph);
-    return mx_rotate3d(inNode as never, amount as never, axis as never);
+    const axis = normalize(r(node, 'axis', vec3(0, 1, 0), context, scopeGraph) as never);
+    const rotationRadians = mul(amount as never, float(Math.PI / 180.0) as never);
+    const s = sin(rotationRadians as never);
+    const c = cos(rotationRadians as never);
+    const oc = sub(float(1), c as never);
+
+    const x = getNodeChannel(inNode, 0);
+    const y = getNodeChannel(inNode, 1);
+    const z = getNodeChannel(inNode, 2);
+    const ax = getNodeChannel(axis, 0);
+    const ay = getNodeChannel(axis, 1);
+    const az = getNodeChannel(axis, 2);
+
+    const m00 = add(mul(mul(oc as never, ax as never) as never, ax as never) as never, c as never);
+    const m01 = sub(mul(mul(oc as never, ax as never) as never, ay as never) as never, mul(az as never, s as never) as never);
+    const m02 = add(mul(mul(oc as never, az as never) as never, ax as never) as never, mul(ay as never, s as never) as never);
+
+    const m10 = add(mul(mul(oc as never, ax as never) as never, ay as never) as never, mul(az as never, s as never) as never);
+    const m11 = add(mul(mul(oc as never, ay as never) as never, ay as never) as never, c as never);
+    const m12 = sub(mul(mul(oc as never, ay as never) as never, az as never) as never, mul(ax as never, s as never) as never);
+
+    const m20 = sub(mul(mul(oc as never, az as never) as never, ax as never) as never, mul(ay as never, s as never) as never);
+    const m21 = add(mul(mul(oc as never, ay as never) as never, az as never) as never, mul(ax as never, s as never) as never);
+    const m22 = add(mul(mul(oc as never, az as never) as never, az as never) as never, c as never);
+
+    return vec3(
+      add(
+        add(mul(m00 as never, x as never) as never, mul(m01 as never, y as never) as never) as never,
+        mul(m02 as never, z as never) as never,
+      ),
+      add(
+        add(mul(m10 as never, x as never) as never, mul(m11 as never, y as never) as never) as never,
+        mul(m12 as never, z as never) as never,
+      ),
+      add(
+        add(mul(m20 as never, x as never) as never, mul(m21 as never, y as never) as never) as never,
+        mul(m22 as never, z as never) as never,
+      ),
+    );
   });
 
   map.set('time', () => mx_timer());
@@ -1032,7 +1073,8 @@ export const buildNodeHandlerRegistry = (deps: NodeHandlerDeps): Map<string, Nod
 
   map.set('blackbody', (node, context, scopeGraph) => {
     const temperature = r(node, 'temperature', 6500, context, scopeGraph);
-    const t = div(float(1000), temperature as never);
+    const temperatureKelvin = clamp(temperature as never, float(800) as never, float(25000) as never);
+    const t = div(float(1000), temperatureKelvin as never);
     const t2 = mul(t as never, t as never);
     const t3 = mul(t2 as never, t as never);
     const lowX = add(
@@ -1043,7 +1085,7 @@ export const buildNodeHandlerRegistry = (deps: NodeHandlerDeps): Map<string, Nod
       add(mul(float(-3.0258469), t3 as never) as never, mul(float(2.1070379), t2 as never) as never) as never,
       add(mul(float(0.2226347), t as never) as never, float(0.24039)) as never,
     );
-    const xc = mx_ifgreatereq(temperature as never, float(4000) as never, highX as never, lowX as never);
+    const xc = mx_ifgreatereq(temperatureKelvin as never, float(4000) as never, highX as never, lowX as never);
     const xc2 = mul(xc as never, xc as never);
     const xc3 = mul(xc2 as never, xc as never);
     const ycLow = add(
@@ -1058,8 +1100,8 @@ export const buildNodeHandlerRegistry = (deps: NodeHandlerDeps): Map<string, Nod
       add(mul(float(3.081758), xc3 as never) as never, mul(float(-5.8733867), xc2 as never) as never) as never,
       add(mul(float(3.75112997), xc as never) as never, float(-0.37001483)) as never,
     );
-    const ycLowMid = mx_ifgreatereq(temperature as never, float(2222) as never, ycMid as never, ycLow as never);
-    const yc = mx_ifgreatereq(temperature as never, float(4000) as never, ycHigh as never, ycLowMid as never);
+    const ycLowMid = mx_ifgreatereq(temperatureKelvin as never, float(2222) as never, ycMid as never, ycLow as never);
+    const yc = mx_ifgreatereq(temperatureKelvin as never, float(4000) as never, ycHigh as never, ycLowMid as never);
     const safeYc = max(yc as never, float(1e-6));
     const x = div(xc as never, safeYc as never);
     const y = float(1);
@@ -1069,26 +1111,28 @@ export const buildNodeHandlerRegistry = (deps: NodeHandlerDeps): Map<string, Nod
       add(
         add(
           mul(float(3.2406), getNodeChannel(xyz, 0) as never) as never,
-          mul(float(-0.9689), getNodeChannel(xyz, 1) as never) as never,
+          mul(float(-1.5372), getNodeChannel(xyz, 1) as never) as never,
         ) as never,
-        mul(float(0.0557), getNodeChannel(xyz, 2) as never) as never,
+        mul(float(-0.4986), getNodeChannel(xyz, 2) as never) as never,
       ) as never,
       add(
         add(
-          mul(float(-1.5372), getNodeChannel(xyz, 0) as never) as never,
+          mul(float(-0.9689), getNodeChannel(xyz, 0) as never) as never,
           mul(float(1.8758), getNodeChannel(xyz, 1) as never) as never,
         ) as never,
-        mul(float(-0.204), getNodeChannel(xyz, 2) as never) as never,
+        mul(float(0.0415), getNodeChannel(xyz, 2) as never) as never,
       ) as never,
       add(
         add(
-          mul(float(-0.4986), getNodeChannel(xyz, 0) as never) as never,
-          mul(float(0.0415), getNodeChannel(xyz, 1) as never) as never,
+          mul(float(0.0557), getNodeChannel(xyz, 0) as never) as never,
+          mul(float(-0.204), getNodeChannel(xyz, 1) as never) as never,
         ) as never,
         mul(float(1.057), getNodeChannel(xyz, 2) as never) as never,
       ) as never,
     );
-    return max(rgb as never, vec3(0, 0, 0) as never);
+    const clampedRgb = max(rgb as never, vec3(0, 0, 0) as never);
+    const validYcMask = step(float(1e-6) as never, yc as never);
+    return mix(vec3(1, 1, 1) as never, clampedRgb as never, validYcMask as never);
   });
 
   map.set('artistic_ior', (node, context, scopeGraph, outputName) => {
