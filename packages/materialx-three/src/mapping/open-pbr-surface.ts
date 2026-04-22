@@ -72,7 +72,6 @@ export const buildOpenPbrSurfaceAssignments = (
   const specularColor = helpers.getInputNode(surfaceNode, 'specular_color', [1, 1, 1]);
   const anisotropy = helpers.getInputNode(surfaceNode, 'specular_roughness_anisotropy', 0);
   const coat = helpers.getInputNode(surfaceNode, 'coat_weight', 0);
-  const coatColor = helpers.getInputNode(surfaceNode, 'coat_color', [1, 1, 1]);
   const coatRoughness = helpers.getInputNode(surfaceNode, 'coat_roughness', 0);
   const coatNormal = helpers.getInputNode(surfaceNode, 'geometry_coat_normal', undefined);
   const fuzz = helpers.getInputNode(surfaceNode, 'fuzz_weight', 0);
@@ -106,7 +105,7 @@ export const buildOpenPbrSurfaceAssignments = (
   const emissionColor = helpers.getInputNode(surfaceNode, 'emission_color', [1, 1, 1]);
   const emissionLuminance = helpers.getInputNode(surfaceNode, 'emission_luminance', 0);
 
-  const colorNode = multiplyNodeValues(multiplyNodeValues(baseColor, baseWeight), coatColor);
+  const colorNode = multiplyNodeValues(baseColor, baseWeight);
   const sheenNode =
     (fuzzColor as { mul?: (other: unknown) => unknown }).mul?.(fuzz) ?? mul(fuzzColor as never, fuzz as never);
   const sheenRoughnessNode =

@@ -33,7 +33,8 @@ export const createThreeMaterialFromDocument = (
   const transmissionAssignment = result.assignments.transmissionNode;
   const opacityLiteral = readNumberLiteral(opacityAssignment);
   const transmissionLiteral = readNumberLiteral(transmissionAssignment);
-  const hasTransmission = transmissionAssignment !== undefined;
+  const hasTransmission =
+    transmissionAssignment !== undefined && (transmissionLiteral === undefined ? true : transmissionLiteral > 0);
   const hasFractionalOpacity =
     opacityAssignment !== undefined && (opacityLiteral === undefined ? true : opacityLiteral < 0.9999);
   const materialWithExtraNodes = material as MeshPhysicalNodeMaterial & {

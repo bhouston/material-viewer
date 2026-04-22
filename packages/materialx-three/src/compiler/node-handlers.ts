@@ -122,6 +122,12 @@ const mx_ifgreatereq_materialx = (value1: unknown, value2: unknown, in1: unknown
   mx_ifgreatereq(value1 as never, value2 as never, in2 as never, in1 as never);
 const mx_ifequal_materialx = (value1: unknown, value2: unknown, in1: unknown, in2: unknown): unknown =>
   mx_ifequal(value1 as never, value2 as never, in2 as never, in1 as never);
+const mx_smoothstep_materialx = (inNode: unknown, low: unknown, high: unknown): unknown => {
+  const hermite = smoothstep(low as never, high as never, inNode as never);
+  const fallback = step(high as never, inNode as never);
+  const useFallback = step(high as never, low as never);
+  return mix(hermite as never, fallback as never, useFallback as never);
+};
 
 const compileNormalMapVector = (sampledNormal: unknown, scaleNode: unknown): unknown => {
   // Keep normalmap node usable in arbitrary graphs (e.g. wired into base_color)
@@ -588,7 +594,7 @@ export const buildNodeHandlerRegistry = (deps: NodeHandlerDeps): Map<string, Nod
     const inNode = r(node, 'in', 0, context, scopeGraph);
     const low = r(node, 'low', 0, context, scopeGraph);
     const high = r(node, 'high', 1, context, scopeGraph);
-    return smoothstep(low as never, high as never, inNode as never);
+    return mx_smoothstep_materialx(inNode, low, high);
   });
 
   map.set('saturate', (node, context, scopeGraph) =>
@@ -615,7 +621,8 @@ export const buildNodeHandlerRegistry = (deps: NodeHandlerDeps): Map<string, Nod
     const outLow = r(node, 'outlow', 0, context, scopeGraph);
     const outHigh = r(node, 'outhigh', 1, context, scopeGraph);
     const doClamp = r(node, 'doclamp', false, context, scopeGraph);
-    const remapped = div(sub(inNode as never, inLow as never), sub(inHigh as never, inLow as never));
+    const inSpan = max(sub(inHigh as never, inLow as never) as never, float(1e-6));
+    const remapped = div(sub(inNode as never, inLow as never), inSpan as never);
     const reciprocalGamma = div(float(1), gamma as never);
     const gammaCorrected = mul(
       pow(abs(remapped as never) as never, reciprocalGamma as never),

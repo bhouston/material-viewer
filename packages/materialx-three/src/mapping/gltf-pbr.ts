@@ -67,9 +67,7 @@ export const buildGltfPbrSurfaceAssignments = (
   const attenuationDistance = hasInput('attenuation_distance')
     ? helpers.getInputNode(surfaceNode, 'attenuation_distance', undefined)
     : undefined;
-  const attenuationColor = hasInput('attenuation_color')
-    ? helpers.getInputNode(surfaceNode, 'attenuation_color', [1, 1, 1])
-    : undefined;
+  const attenuationColor = helpers.getInputNode(surfaceNode, 'attenuation_color', [1, 1, 1]);
   const thickness = hasInput('thickness') ? helpers.getInputNode(surfaceNode, 'thickness', 0) : undefined;
   const dispersion = hasInput('dispersion') ? helpers.getInputNode(surfaceNode, 'dispersion', 0) : undefined;
   const anisotropyStrength = hasInput('anisotropy_strength')
