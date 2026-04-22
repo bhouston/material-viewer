@@ -203,6 +203,14 @@ const transformNormalBetweenSpaces = (
 const safePowerScalar = (base: unknown, exponent: unknown): unknown =>
   mul(sign(base as never) as never, pow(abs(base as never) as never, exponent as never));
 
+const boolToFloatMask = (value: unknown): unknown => {
+  const maybeBoolNode = value as { nodeType?: string; select?: (whenTrue: unknown, whenFalse: unknown) => unknown };
+  if (maybeBoolNode?.nodeType === 'bool' && typeof maybeBoolNode.select === 'function') {
+    return maybeBoolNode.select(float(1), float(0));
+  }
+  return float(value as never);
+};
+
 const safePowerNode = (in1: unknown, in2: unknown, outputType?: string): unknown => {
   if (outputType === 'color4' || outputType === 'vector4') {
     return vec4(
@@ -375,19 +383,19 @@ export const buildNodeHandlerRegistry = (deps: NodeHandlerDeps): Map<string, Nod
   map.set('and', (node, context, scopeGraph) => {
     const in1 = r(node, 'in1', 0, context, scopeGraph);
     const in2 = r(node, 'in2', 0, context, scopeGraph);
-    return clamp(mul(in1 as never, in2 as never) as never, float(0), float(1));
+    return clamp(mul(boolToFloatMask(in1) as never, boolToFloatMask(in2) as never) as never, float(0), float(1));
   });
 
   map.set('or', (node, context, scopeGraph) => {
     const in1 = r(node, 'in1', 0, context, scopeGraph);
     const in2 = r(node, 'in2', 0, context, scopeGraph);
-    return clamp(add(in1 as never, in2 as never) as never, float(0), float(1));
+    return clamp(add(boolToFloatMask(in1) as never, boolToFloatMask(in2) as never) as never, float(0), float(1));
   });
 
   map.set('xor', (node, context, scopeGraph) => {
     const in1 = r(node, 'in1', 0, context, scopeGraph);
     const in2 = r(node, 'in2', 0, context, scopeGraph);
-    return abs(sub(in1 as never, in2 as never) as never);
+    return abs(sub(boolToFloatMask(in1) as never, boolToFloatMask(in2) as never) as never);
   });
 
   map.set('minus', (node, context, scopeGraph) => {
@@ -1111,7 +1119,7 @@ export const buildNodeHandlerRegistry = (deps: NodeHandlerDeps): Map<string, Nod
 
   map.set('not', (node, context, scopeGraph) => {
     const inNode = r(node, 'in', 0, context, scopeGraph);
-    return sub(float(1), inNode as never);
+    return sub(float(1), boolToFloatMask(inNode) as never);
   });
 
   map.set('ramp4', (node, context, scopeGraph) => {
