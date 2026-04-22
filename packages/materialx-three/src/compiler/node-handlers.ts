@@ -501,11 +501,10 @@ export const buildNodeHandlerRegistry = (deps: NodeHandlerDeps): Map<string, Nod
     return mx_ifgreater(distanceSquared as never, radiusSquared as never, float(0) as never, float(1) as never);
   });
 
-  register(
-    map,
-    ['dot', 'dotproduct'],
-    bin(deps, 'in1', 'in2', (left, right) => dot(left as never, right as never)),
-  );
+  // MaterialX "dot" node is a utility metadata passthrough (input: "in"),
+  // while "dotproduct" is the binary math operation (inputs: "in1"/"in2").
+  map.set('dot', (node, context, scopeGraph) => r(node, 'in', 0, context, scopeGraph));
+  map.set('dotproduct', bin(deps, 'in1', 'in2', (left, right) => dot(left as never, right as never)));
 
   map.set('magnitude', (node, context, scopeGraph) => {
     const inNode = r(node, 'in', vec3(0, 0, 0), context, scopeGraph);
@@ -784,7 +783,14 @@ export const buildNodeHandlerRegistry = (deps: NodeHandlerDeps): Map<string, Nod
   });
 
   map.set('time', () => mx_timer());
-  map.set('frame', () => mx_frame());
+  map.set('frame', (node) => {
+    const frame = mx_frame();
+    // WGSL keeps frame as u32, so cast for float-typed frame nodedefs.
+    if (node.type === 'float') {
+      return float(frame as never);
+    }
+    return frame;
+  });
 
   map.set('ramplr', (node, context, scopeGraph) => {
     const valueL = r(node, 'valuel', 0, context, scopeGraph);
