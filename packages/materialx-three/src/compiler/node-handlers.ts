@@ -114,6 +114,15 @@ const register = (map: Map<string, NodeHandler>, keys: readonly string[], handle
   }
 };
 
+// TSL conditional helpers currently pick the opposite branch ordering relative to MaterialX.
+// Normalize here so all MaterialX nodes keep "condition ? in1 : in2" semantics.
+const mx_ifgreater_materialx = (value1: unknown, value2: unknown, in1: unknown, in2: unknown): unknown =>
+  mx_ifgreater(value1 as never, value2 as never, in2 as never, in1 as never);
+const mx_ifgreatereq_materialx = (value1: unknown, value2: unknown, in1: unknown, in2: unknown): unknown =>
+  mx_ifgreatereq(value1 as never, value2 as never, in2 as never, in1 as never);
+const mx_ifequal_materialx = (value1: unknown, value2: unknown, in1: unknown, in2: unknown): unknown =>
+  mx_ifequal(value1 as never, value2 as never, in2 as never, in1 as never);
+
 const compileNormalMapVector = (sampledNormal: unknown, scaleNode: unknown): unknown => {
   // Keep normalmap node usable in arbitrary graphs (e.g. wired into base_color)
   // without depending on view-space matrix nodes that are only valid in normal slots.
@@ -504,7 +513,7 @@ export const buildNodeHandlerRegistry = (deps: NodeHandlerDeps): Map<string, Nod
     const delta = sub(texcoord as never, center as never);
     const distanceSquared = dot(delta as never, delta as never);
     const radiusSquared = mul(radius as never, radius as never);
-    return mx_ifgreater(distanceSquared as never, radiusSquared as never, float(0) as never, float(1) as never);
+    return mx_ifgreater_materialx(distanceSquared, radiusSquared, float(0), float(1));
   });
 
   // MaterialX "dot" node is a utility metadata passthrough (input: "in"),
@@ -614,7 +623,7 @@ export const buildNodeHandlerRegistry = (deps: NodeHandlerDeps): Map<string, Nod
     );
     const scaled = add(outLow as never, mul(gammaCorrected as never, sub(outHigh as never, outLow as never) as never));
     const clamped = clamp(scaled as never, outLow as never, outHigh as never);
-    return mx_ifequal(doClamp as never, float(1) as never, clamped as never, scaled as never);
+    return mx_ifequal_materialx(doClamp, float(1), clamped, scaled);
   });
 
   map.set('open_pbr_anisotropy', (node, context, scopeGraph) => {
@@ -879,7 +888,7 @@ export const buildNodeHandlerRegistry = (deps: NodeHandlerDeps): Map<string, Nod
     const value2 = r(node, 'value2', 0, context, scopeGraph);
     const in1 = r(node, 'in1', 1, context, scopeGraph);
     const in2 = r(node, 'in2', 0, context, scopeGraph);
-    return mx_ifgreater(value1 as never, value2 as never, in1 as never, in2 as never);
+    return mx_ifgreater_materialx(value1, value2, in1, in2);
   });
 
   map.set('ifgreatereq', (node, context, scopeGraph) => {
@@ -887,7 +896,7 @@ export const buildNodeHandlerRegistry = (deps: NodeHandlerDeps): Map<string, Nod
     const value2 = r(node, 'value2', 0, context, scopeGraph);
     const in1 = r(node, 'in1', 1, context, scopeGraph);
     const in2 = r(node, 'in2', 0, context, scopeGraph);
-    return mx_ifgreatereq(value1 as never, value2 as never, in1 as never, in2 as never);
+    return mx_ifgreatereq_materialx(value1, value2, in1, in2);
   });
 
   map.set('ifequal', (node, context, scopeGraph) => {
@@ -895,7 +904,7 @@ export const buildNodeHandlerRegistry = (deps: NodeHandlerDeps): Map<string, Nod
     const value2 = r(node, 'value2', 0, context, scopeGraph);
     const in1 = r(node, 'in1', 1, context, scopeGraph);
     const in2 = r(node, 'in2', 0, context, scopeGraph);
-    return mx_ifequal(value1 as never, value2 as never, in1 as never, in2 as never);
+    return mx_ifequal_materialx(value1, value2, in1, in2);
   });
 
   map.set('reflect', (node, context, scopeGraph) => {
@@ -1085,7 +1094,7 @@ export const buildNodeHandlerRegistry = (deps: NodeHandlerDeps): Map<string, Nod
       add(mul(float(-3.0258469), t3 as never) as never, mul(float(2.1070379), t2 as never) as never) as never,
       add(mul(float(0.2226347), t as never) as never, float(0.24039)) as never,
     );
-    const xc = mx_ifgreatereq(temperatureKelvin as never, float(4000) as never, highX as never, lowX as never);
+    const xc = mx_ifgreatereq_materialx(temperatureKelvin, float(4000), highX, lowX);
     const xc2 = mul(xc as never, xc as never);
     const xc3 = mul(xc2 as never, xc as never);
     const ycLow = add(
@@ -1100,8 +1109,8 @@ export const buildNodeHandlerRegistry = (deps: NodeHandlerDeps): Map<string, Nod
       add(mul(float(3.081758), xc3 as never) as never, mul(float(-5.8733867), xc2 as never) as never) as never,
       add(mul(float(3.75112997), xc as never) as never, float(-0.37001483)) as never,
     );
-    const ycLowMid = mx_ifgreatereq(temperatureKelvin as never, float(2222) as never, ycMid as never, ycLow as never);
-    const yc = mx_ifgreatereq(temperatureKelvin as never, float(4000) as never, ycHigh as never, ycLowMid as never);
+    const ycLowMid = mx_ifgreatereq_materialx(temperatureKelvin, float(2222), ycMid, ycLow);
+    const yc = mx_ifgreatereq_materialx(temperatureKelvin, float(4000), ycHigh, ycLowMid);
     const safeYc = max(yc as never, float(1e-6));
     const x = div(xc as never, safeYc as never);
     const y = float(1);
