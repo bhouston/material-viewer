@@ -105,7 +105,6 @@ export const buildStandardSurfaceAssignments = (
     colorNode,
     roughnessNode: roughness,
     specularColorNode: specularColor,
-    sheenColorNode: sheenColor,
     emissiveNode,
     normalNode: normal,
   };
@@ -123,7 +122,7 @@ export const buildStandardSurfaceAssignments = (
     assignments.clearcoatNormalNode = coatNormal;
   }
   if (sheenEnabled) {
-    assignments.sheenNode = sheen;
+    assignments.sheenNode = mul(sheen as never, sheenColor as never);
     if (!isConstNear(sheenRoughness, 0.3)) assignments.sheenRoughnessNode = sheenRoughness;
   }
   if (!isEffectivelyOne(opacity)) assignments.opacityNode = opacity;

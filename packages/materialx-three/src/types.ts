@@ -37,7 +37,6 @@ export interface MaterialSlotAssignments {
   clearcoatRoughnessNode?: unknown;
   clearcoatNormalNode?: unknown;
   sheenNode?: unknown;
-  sheenColorNode?: unknown;
   sheenRoughnessNode?: unknown;
   normalNode?: unknown;
   emissiveNode?: unknown;

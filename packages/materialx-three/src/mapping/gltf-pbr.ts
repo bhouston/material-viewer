@@ -133,7 +133,6 @@ export const buildGltfPbrSurfaceAssignments = (
   }
   if (sheenEnabled) {
     assignments.sheenNode = sheenColor;
-    assignments.sheenColorNode = sheenColor;
     if (!isEffectivelyZero(sheenRoughness)) assignments.sheenRoughnessNode = sheenRoughness;
   }
   if (transmissionEnabled) assignments.transmissionNode = transmission;

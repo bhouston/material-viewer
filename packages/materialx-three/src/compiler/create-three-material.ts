@@ -38,7 +38,6 @@ export const createThreeMaterialFromDocument = (
   const hasFractionalOpacity =
     opacityAssignment !== undefined && (opacityLiteral === undefined ? true : opacityLiteral < 0.9999);
   const materialWithExtraNodes = material as MeshPhysicalNodeMaterial & {
-    sheenColorNode?: unknown;
     transmissionColorNode?: unknown;
   };
 
@@ -81,7 +80,6 @@ export const createThreeMaterialFromDocument = (
   material.clearcoatRoughnessNode = result.assignments.clearcoatRoughnessNode as never;
   material.clearcoatNormalNode = result.assignments.clearcoatNormalNode as never;
   material.sheenNode = result.assignments.sheenNode as never;
-  materialWithExtraNodes.sheenColorNode = result.assignments.sheenColorNode as never;
   material.sheenRoughnessNode = result.assignments.sheenRoughnessNode as never;
   material.normalNode = result.assignments.normalNode as never;
   material.emissiveNode = result.assignments.emissiveNode as never;
