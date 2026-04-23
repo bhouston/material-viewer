@@ -272,8 +272,13 @@ export const buildNodeHandlerRegistry = (deps: NodeHandlerDeps): Map<string, Nod
   map.set('gltf_image', (node, context, scopeGraph) => compileGltfImageNode(node, context, scopeGraph));
 
   map.set('gltf_colorimage', (node, context, scopeGraph, outputName) => {
+    const fileInput = readInput(node, 'file');
     const sampled = compileGltfTextureSample(node, context, scopeGraph);
-    const colorCorrected = applyTextureColorSpace(context.document.attributes.colorspace, sampled);
+    const colorCorrected = applyTextureColorSpace(
+      fileInput?.attributes.colorspace,
+      context.document.attributes.colorspace,
+      sampled,
+    );
     const colorFactor = r(node, 'color', vec4(1, 1, 1, 1), context, scopeGraph);
     const geomColor = r(node, 'geomcolor', vec4(1, 1, 1, 1), context, scopeGraph);
     const modulated = mul(mul(colorCorrected as never, colorFactor as never) as never, geomColor as never);

@@ -68,7 +68,11 @@ export const createTextureNodeCompiler = ({ resolveInputNode, readInput, warn, t
       context.options.textureResolver ?? createTextureResolver({ basePath: context.options.basePath });
     const tex = textureResolver.resolve(uri, { document: context.document, node });
     const sampled = texture(tex, transformedUv as never);
-    const colorCorrected = applyTextureColorSpace(context.document.attributes.colorspace, sampled);
+    const colorCorrected = applyTextureColorSpace(
+      fileInput?.attributes.colorspace,
+      context.document.attributes.colorspace,
+      sampled,
+    );
     return selectTextureSample(colorCorrected, node.type);
   };
 
@@ -123,8 +127,13 @@ export const createTextureNodeCompiler = ({ resolveInputNode, readInput, warn, t
     context: CompileContext,
     scopeGraph: MaterialXNodeGraph | undefined,
   ): unknown => {
+    const fileInput = readInput(node, 'file');
     const sampled = compileGltfTextureSample(node, context, scopeGraph);
-    const colorCorrected = applyTextureColorSpace(context.document.attributes.colorspace, sampled);
+    const colorCorrected = applyTextureColorSpace(
+      fileInput?.attributes.colorspace,
+      context.document.attributes.colorspace,
+      sampled,
+    );
     const sampledValue = selectTextureSample(colorCorrected, node.type);
     const factorInput = readInput(node, 'factor');
     const factor = factorInput ? resolveInputNode(node, 'factor', 1, context, scopeGraph) : undefined;
@@ -159,7 +168,11 @@ export const createTextureNodeCompiler = ({ resolveInputNode, readInput, warn, t
       context.options.textureResolver ?? createTextureResolver({ basePath: context.options.basePath });
     const tex = textureResolver.resolve(uri, { document: context.document, node });
     const sampled = texture(tex, transformedUv as never);
-    const colorCorrected = applyTextureColorSpace(context.document.attributes.colorspace, sampled);
+    const colorCorrected = applyTextureColorSpace(
+      fileInput?.attributes.colorspace,
+      context.document.attributes.colorspace,
+      sampled,
+    );
     return selectTextureSample(colorCorrected, node.type);
   };
 
