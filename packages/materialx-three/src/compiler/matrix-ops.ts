@@ -1,6 +1,6 @@
-import { add, div, mul, sub, vec2, vec3, vec4 } from 'three/tsl';
+import { add, div, mat3, mat4, mul, sub, vec2, vec3, vec4 } from 'three/tsl';
 import type { MatrixValue } from './internal-types.js';
-import { asMatrixValue } from './value-coercion.js';
+import { isMatrixValue } from './value-coercion.js';
 
 export const outputNameToChannelIndex = (outputName?: string): number => {
   if (!outputName) {
@@ -57,6 +57,41 @@ export const makeVectorFromComponents = (components: unknown[], size: 2 | 3 | 4)
     return vec3(components[0] as never, components[1] as never, components[2] as never);
   }
   return vec4(components[0] as never, components[1] as never, components[2] as never, components[3] as never);
+};
+
+export const matrixValueToNode = (matrix: MatrixValue): unknown => {
+  const flat = matrix.values.flat();
+  if (matrix.kind === 'matrix33') {
+    return mat3(
+      flat[0] as never,
+      flat[1] as never,
+      flat[2] as never,
+      flat[3] as never,
+      flat[4] as never,
+      flat[5] as never,
+      flat[6] as never,
+      flat[7] as never,
+      flat[8] as never,
+    );
+  }
+  return mat4(
+    flat[0] as never,
+    flat[1] as never,
+    flat[2] as never,
+    flat[3] as never,
+    flat[4] as never,
+    flat[5] as never,
+    flat[6] as never,
+    flat[7] as never,
+    flat[8] as never,
+    flat[9] as never,
+    flat[10] as never,
+    flat[11] as never,
+    flat[12] as never,
+    flat[13] as never,
+    flat[14] as never,
+    flat[15] as never,
+  );
 };
 
 const dotRow = (row: unknown[], vector: unknown[]): unknown => {
@@ -231,25 +266,45 @@ export const applyMatrixTransform = (
   variant: 'vector2M3' | 'vector3' | 'vector3M4' | 'vector4',
 ): unknown => {
   if (variant === 'vector2M3') {
-    const matrix = asMatrixValue(matrixValue, 'matrix33');
     const [x, y] = toVectorComponents(inputValue, 2, [0, 0]);
-    const transformed = multiplyMatrixVector(matrix, [x, y, 1]);
-    return makeVectorFromComponents(transformed.slice(0, 2), 2);
+    if (isMatrixValue(matrixValue) && matrixValue.kind === 'matrix33') {
+      const transformed = multiplyMatrixVector(matrixValue, [x, y, 1]);
+      return makeVectorFromComponents(transformed.slice(0, 2), 2);
+    }
+    const transformed = mul(matrixValue as never, vec3(x as never, y as never, 1 as never) as never);
+    return vec2(getNodeChannel(transformed, 0) as never, getNodeChannel(transformed, 1) as never);
   }
   if (variant === 'vector3') {
-    const matrix = asMatrixValue(matrixValue, 'matrix33');
     const vector = toVectorComponents(inputValue, 3, [0, 0, 0]);
-    const transformed = multiplyMatrixVector(matrix, vector);
-    return makeVectorFromComponents(transformed, 3);
+    if (isMatrixValue(matrixValue) && matrixValue.kind === 'matrix33') {
+      const transformed = multiplyMatrixVector(matrixValue, vector);
+      return makeVectorFromComponents(transformed, 3);
+    }
+    return mul(
+      matrixValue as never,
+      vec3(vector[0] as never, vector[1] as never, vector[2] as never) as never,
+    );
   }
   if (variant === 'vector3M4') {
-    const matrix = asMatrixValue(matrixValue, 'matrix44');
     const [x, y, z] = toVectorComponents(inputValue, 3, [0, 0, 0]);
-    const transformed = multiplyMatrixVector(matrix, [x, y, z, 1]);
-    return makeVectorFromComponents(transformed.slice(0, 3), 3);
+    if (isMatrixValue(matrixValue) && matrixValue.kind === 'matrix44') {
+      const transformed = multiplyMatrixVector(matrixValue, [x, y, z, 1]);
+      return makeVectorFromComponents(transformed.slice(0, 3), 3);
+    }
+    const transformed = mul(matrixValue as never, vec4(x as never, y as never, z as never, 1 as never) as never);
+    return vec3(
+      getNodeChannel(transformed, 0) as never,
+      getNodeChannel(transformed, 1) as never,
+      getNodeChannel(transformed, 2) as never,
+    );
   }
-  const matrix = asMatrixValue(matrixValue, 'matrix44');
   const vector = toVectorComponents(inputValue, 4, [0, 0, 0, 1]);
-  const transformed = multiplyMatrixVector(matrix, vector);
-  return makeVectorFromComponents(transformed, 4);
+  if (isMatrixValue(matrixValue) && matrixValue.kind === 'matrix44') {
+    const transformed = multiplyMatrixVector(matrixValue, vector);
+    return makeVectorFromComponents(transformed, 4);
+  }
+  return mul(
+    matrixValue as never,
+    vec4(vector[0] as never, vector[1] as never, vector[2] as never, vector[3] as never) as never,
+  );
 };

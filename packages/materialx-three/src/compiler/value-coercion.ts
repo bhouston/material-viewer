@@ -24,6 +24,21 @@ const parseMatrixEntries = (value: string | undefined, expectedCount: number): n
   return entries;
 };
 
+const parseMatrixArrayEntries = (value: unknown[], size: 3 | 4): number[] | undefined => {
+  const expectedCount = size * size;
+  const toNumber = (entry: unknown): number => (typeof entry === 'number' ? entry : Number(entry));
+  if (value.length === expectedCount) {
+    const flat = value.map(toNumber);
+    return flat.every((entry) => Number.isFinite(entry)) ? flat : undefined;
+  }
+  if (value.length === size && value.every((row) => Array.isArray(row) && row.length === size)) {
+    const nested = value as unknown[][];
+    const flat = nested.flat().map(toNumber);
+    return flat.every((entry) => Number.isFinite(entry)) ? flat : undefined;
+  }
+  return undefined;
+};
+
 export const matrixFromEntries = (kind: 'matrix33' | 'matrix44', entries: number[]): MatrixValue => {
   const size = kind === 'matrix33' ? 3 : 4;
   const values: unknown[][] = [];
@@ -76,17 +91,13 @@ export const toNodeValue = (value: unknown, typeHint?: string): unknown => {
     return float(value ? 1 : 0);
   }
   if (Array.isArray(value)) {
-    if (typeHint === 'matrix33' && value.length === 9) {
-      const entries = value.map((entry) => (typeof entry === 'number' ? entry : Number(entry)));
-      if (entries.every((entry) => Number.isFinite(entry))) {
-        return matrixFromEntries('matrix33', entries as number[]);
-      }
+    if (typeHint === 'matrix33') {
+      const entries = parseMatrixArrayEntries(value, 3);
+      return entries ? matrixFromEntries('matrix33', entries) : matrixIdentity('matrix33');
     }
-    if (typeHint === 'matrix44' && value.length === 16) {
-      const entries = value.map((entry) => (typeof entry === 'number' ? entry : Number(entry)));
-      if (entries.every((entry) => Number.isFinite(entry))) {
-        return matrixFromEntries('matrix44', entries as number[]);
-      }
+    if (typeHint === 'matrix44') {
+      const entries = parseMatrixArrayEntries(value, 4);
+      return entries ? matrixFromEntries('matrix44', entries) : matrixIdentity('matrix44');
     }
     if (value.length === 2) {
       return vec2(value[0] ?? 0, value[1] ?? 0);

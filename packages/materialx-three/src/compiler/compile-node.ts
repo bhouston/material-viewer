@@ -1,12 +1,31 @@
 import type { MaterialXNode, MaterialXNodeGraph } from '@material-viewer/materialx';
 import type { CompileContext, NodeHandler } from './internal-types.js';
 import { cacheKey, createResolveInputNode, readInput } from './inputs.js';
+import { getNodeChannel, outputNameToChannelIndex } from './matrix-ops.js';
 import { buildNodeHandlerRegistry } from './node-handlers.js';
 import { createTextureNodeCompiler } from './texture-nodes.js';
 import { toScalar, warn } from './warnings.js';
 import { toNodeValue } from './value-coercion.js';
 
 let nodeHandlers!: Map<string, NodeHandler>;
+const channelOutputs = new Set([
+  'outx',
+  'outy',
+  'outz',
+  'outw',
+  'outr',
+  'outg',
+  'outb',
+  'outa',
+  'x',
+  'y',
+  'z',
+  'w',
+  'r',
+  'g',
+  'b',
+  'a',
+]);
 
 export function compileNode(
   node: MaterialXNode,
@@ -33,6 +52,10 @@ export function compileNode(
       nodeName: node.name,
     });
     compiled = toNodeValue(node.attributes.value ?? 0, node.type);
+  }
+
+  if (outputName && channelOutputs.has(outputName.toLowerCase())) {
+    compiled = getNodeChannel(compiled, outputNameToChannelIndex(outputName));
   }
 
   context.cache.set(key, compiled);
