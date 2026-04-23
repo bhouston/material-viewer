@@ -1,6 +1,7 @@
 import type { MaterialXDocument } from '@materialx-js/materialx';
 import { Color } from 'three';
-import { MeshPhysicalNodeMaterial } from 'three/webgpu';
+import { cos, float, mul, sin, vec2 } from 'three/tsl';
+import { DoubleSide, MeshPhysicalNodeMaterial } from 'three/webgpu';
 import type { MaterialXThreeCompileOptions, MaterialXThreeCompileResult } from '../types.js';
 import { compileMaterialXToTSL } from './compile-material.js';
 
@@ -33,9 +34,13 @@ export const createThreeMaterialFromDocument = (
   const opacityLiteral = readNumberLiteral(opacityAssignment);
   const transmissionLiteral = readNumberLiteral(transmissionAssignment);
   const hasTransmission =
-    transmissionAssignment !== undefined && (transmissionLiteral === undefined ? true : transmissionLiteral > 0.0001);
+    transmissionAssignment !== undefined && (transmissionLiteral === undefined ? true : transmissionLiteral > 0);
   const hasFractionalOpacity =
     opacityAssignment !== undefined && (opacityLiteral === undefined ? true : opacityLiteral < 0.9999);
+  const materialWithExtraNodes = material as MeshPhysicalNodeMaterial & {
+    sheenColorNode?: unknown;
+    transmissionColorNode?: unknown;
+  };
 
   material.color = new Color(1, 1, 1);
   material.colorNode = result.assignments.colorNode as never;
@@ -46,15 +51,37 @@ export const createThreeMaterialFromDocument = (
   material.metalnessNode = result.assignments.metalnessNode as never;
   material.specularIntensityNode = result.assignments.specularIntensityNode as never;
   material.specularColorNode = result.assignments.specularColorNode as never;
-  material.anisotropyNode = result.assignments.anisotropyNode as never;
-  const anisotropyRotation = readNumberLiteral(result.assignments.anisotropyRotation);
-  if (anisotropyRotation !== undefined) {
-    material.anisotropyRotation = anisotropyRotation;
+  const anisotropyStrengthAssignment = result.assignments.anisotropyNode;
+  const anisotropyRotationAssignment = result.assignments.anisotropyRotation;
+  if (anisotropyStrengthAssignment !== undefined || anisotropyRotationAssignment !== undefined) {
+    const anisotropyStrengthNode =
+      anisotropyStrengthAssignment === undefined
+        ? float(0)
+        : typeof anisotropyStrengthAssignment === 'number'
+          ? float(anisotropyStrengthAssignment)
+          : (anisotropyStrengthAssignment as never);
+    const anisotropyRotationNode =
+      anisotropyRotationAssignment === undefined
+        ? float(0)
+        : typeof anisotropyRotationAssignment === 'number'
+          ? float(anisotropyRotationAssignment)
+          : (anisotropyRotationAssignment as never);
+    const anisotropyDirection = vec2(
+      cos(anisotropyRotationNode as never) as never,
+      sin(anisotropyRotationNode as never) as never,
+    );
+
+    // Encode anisotropy direction directly in the vector assignment.
+    material.anisotropyNode = mul(anisotropyDirection as never, anisotropyStrengthNode as never) as never;
+
+    // Avoid a second rotation pass from MeshPhysicalMaterial defaults/properties.
+    material.anisotropyRotation = 0;
   }
   material.clearcoatNode = result.assignments.clearcoatNode as never;
   material.clearcoatRoughnessNode = result.assignments.clearcoatRoughnessNode as never;
   material.clearcoatNormalNode = result.assignments.clearcoatNormalNode as never;
   material.sheenNode = result.assignments.sheenNode as never;
+  materialWithExtraNodes.sheenColorNode = result.assignments.sheenColorNode as never;
   material.sheenRoughnessNode = result.assignments.sheenRoughnessNode as never;
   material.normalNode = result.assignments.normalNode as never;
   material.emissiveNode = result.assignments.emissiveNode as never;
@@ -74,11 +101,14 @@ export const createThreeMaterialFromDocument = (
   if (hasTransmission) {
     // Keep the non-node scalar enabled so Three routes the material through
     // its transmission render path in both WebGL and WebGPU backends.
+    material.side = DoubleSide;
     material.transmission = transmissionLiteral ?? 1;
     material.opacity = 1;
   } else if (opacityLiteral !== undefined) {
     material.opacity = opacityLiteral;
   }
+  materialWithExtraNodes.transmissionColorNode =
+    (result.assignments.transmissionColorNode ?? result.assignments.attenuationColorNode) as never;
   material.attenuationColorNode = result.assignments.attenuationColorNode as never;
   material.attenuationDistanceNode = result.assignments.attenuationDistanceNode as never;
   material.iorNode = result.assignments.iorNode as never;

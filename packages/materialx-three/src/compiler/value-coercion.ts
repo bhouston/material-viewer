@@ -1,4 +1,4 @@
-import { float, vec2, vec3, vec4 } from 'three/tsl';
+import { float, int, vec2, vec3, vec4 } from 'three/tsl';
 import { parseFloatValue, parseVector2Value, parseVector3Value, parseVector4Value } from '../runtime/value-parsing.js';
 import type { MatrixValue } from './internal-types.js';
 
@@ -58,9 +58,21 @@ export const toNodeValue = (value: unknown, typeHint?: string): unknown => {
     return value;
   }
   if (typeof value === 'number') {
+    if (typeHint === 'integer') {
+      return int(Math.trunc(value));
+    }
+    if (typeHint === 'boolean') {
+      return float(value !== 0 ? 1 : 0);
+    }
     return float(value);
   }
   if (typeof value === 'boolean') {
+    if (typeHint === 'boolean') {
+      return float(value ? 1 : 0);
+    }
+    if (typeHint === 'integer') {
+      return int(value ? 1 : 0);
+    }
     return float(value ? 1 : 0);
   }
   if (Array.isArray(value)) {
@@ -90,6 +102,9 @@ export const toNodeValue = (value: unknown, typeHint?: string): unknown => {
     if (typeHint === 'boolean') {
       const normalized = value.trim().toLowerCase();
       return float(normalized === 'true' || normalized === '1' ? 1 : 0);
+    }
+    if (typeHint === 'integer') {
+      return int(Math.trunc(parseFloatValue(value, 0)));
     }
     if (typeHint === 'matrix33') {
       const entries = parseMatrixEntries(value, 9);

@@ -4,7 +4,6 @@ import {
   add,
   acos,
   asin,
-  atan2,
   ceil,
   checker,
   clamp,
@@ -21,6 +20,7 @@ import {
   log,
   luminance,
   max,
+  mat3,
   min,
   mix,
   mod,
@@ -34,21 +34,23 @@ import {
   mx_ifequal,
   mx_ifgreater,
   mx_ifgreatereq,
+  mx_atan2,
   mx_noise_float,
   mx_place2d,
   mx_ramplr,
   mx_ramptb,
   mx_rgbtohsv,
-  mx_rotate2d,
-  mx_rotate3d,
-  mx_safepower,
   mx_splitlr,
   mx_splittb,
   mx_timer,
   mx_unifiednoise2d,
   mx_unifiednoise3d,
   mx_worley_noise_float,
+  modelNormalMatrix,
+  modelWorldMatrix,
+  modelWorldMatrixInverse,
   normalMap,
+  positionLocal,
   normalWorld,
   normalize,
   positionWorld,
@@ -112,6 +114,141 @@ const register = (map: Map<string, NodeHandler>, keys: readonly string[], handle
   }
 };
 
+// TSL conditional helpers currently pick the opposite branch ordering relative to MaterialX.
+// Normalize here so all MaterialX nodes keep "condition ? in1 : in2" semantics.
+const mx_ifgreater_materialx = (value1: unknown, value2: unknown, in1: unknown, in2: unknown): unknown =>
+  mx_ifgreater(value1 as never, value2 as never, in2 as never, in1 as never);
+const mx_ifgreatereq_materialx = (value1: unknown, value2: unknown, in1: unknown, in2: unknown): unknown =>
+  mx_ifgreatereq(value1 as never, value2 as never, in2 as never, in1 as never);
+const mx_ifequal_materialx = (value1: unknown, value2: unknown, in1: unknown, in2: unknown): unknown =>
+  mx_ifequal(value1 as never, value2 as never, in2 as never, in1 as never);
+const mx_smoothstep_materialx = (inNode: unknown, low: unknown, high: unknown): unknown => {
+  const hermite = smoothstep(low as never, high as never, inNode as never);
+  const fallback = step(high as never, inNode as never);
+  const useFallback = step(high as never, low as never);
+  return mix(hermite as never, fallback as never, useFallback as never);
+};
+
+const compileNormalMapVector = (sampledNormal: unknown, scaleNode: unknown): unknown => {
+  // Keep normalmap node usable in arbitrary graphs (e.g. wired into base_color)
+  // without depending on view-space matrix nodes that are only valid in normal slots.
+  const tangentNormal = sub(mul(sampledNormal as never, vec3(2, 2, 2) as never) as never, vec3(1, 1, 1) as never);
+  return normalize(
+    vec3(
+      mul(getNodeChannel(tangentNormal, 0) as never, scaleNode as never),
+      mul(getNodeChannel(tangentNormal, 1) as never, scaleNode as never),
+      getNodeChannel(tangentNormal, 2) as never,
+    ) as never,
+  );
+};
+
+const normalizeSpaceName = (value: unknown): 'object' | 'world' => {
+  if (typeof value !== 'string') {
+    return 'world';
+  }
+  const normalized = value.trim().toLowerCase();
+  if (normalized === 'object' || normalized === 'model') {
+    return 'object';
+  }
+  return 'world';
+};
+
+const readSpaceInput = (node: MaterialXNode, inputName: string, fallback: 'object' | 'world'): 'object' | 'world' => {
+  const input = readInput(node, inputName);
+  const rawValue = input?.value ?? input?.attributes.value;
+  if (rawValue === undefined || rawValue === null) {
+    return fallback;
+  }
+  return normalizeSpaceName(rawValue);
+};
+
+const transformPointBetweenSpaces = (
+  inNode: unknown,
+  fromSpace: 'object' | 'world',
+  toSpace: 'object' | 'world',
+): unknown => {
+  if (fromSpace === toSpace) {
+    return inNode;
+  }
+  const inPoint = vec3(inNode as never);
+  const makeVec4 = vec4 as unknown as (x: unknown, y: unknown) => unknown;
+  const point4 = makeVec4(inPoint, float(1));
+  if (fromSpace === 'object' && toSpace === 'world') {
+    return (modelWorldMatrix as { mul: (rhs: unknown) => { xyz?: unknown } }).mul(point4 as never).xyz;
+  }
+  return (modelWorldMatrixInverse as { mul: (rhs: unknown) => { xyz?: unknown } }).mul(point4 as never).xyz;
+};
+
+const transformVectorBetweenSpaces = (
+  inNode: unknown,
+  fromSpace: 'object' | 'world',
+  toSpace: 'object' | 'world',
+): unknown => {
+  if (fromSpace === toSpace) {
+    return inNode;
+  }
+  const inVector = vec3(inNode as never);
+  const makeVec4 = vec4 as unknown as (x: unknown, y: unknown) => unknown;
+  const vector4 = makeVec4(inVector, float(0));
+  if (fromSpace === 'object' && toSpace === 'world') {
+    return (modelWorldMatrix as { mul: (rhs: unknown) => { xyz?: unknown } }).mul(vector4 as never).xyz;
+  }
+  return (modelWorldMatrixInverse as { mul: (rhs: unknown) => { xyz?: unknown } }).mul(vector4 as never).xyz;
+};
+
+const transformNormalBetweenSpaces = (
+  inNode: unknown,
+  fromSpace: 'object' | 'world',
+  toSpace: 'object' | 'world',
+): unknown => {
+  const makeVec3 = vec3 as unknown as (value: unknown) => unknown;
+  const normalizeUnsafe = normalize as unknown as (value: unknown) => unknown;
+  if (fromSpace === toSpace) {
+    return normalizeUnsafe(makeVec3(inNode));
+  }
+  const inNormal = makeVec3(inNode);
+  if (fromSpace === 'object' && toSpace === 'world') {
+    return normalizeUnsafe(mul(modelNormalMatrix as never, inNormal as never));
+  }
+  return normalizeUnsafe(mul(mat3(modelWorldMatrix as never) as never, inNormal as never));
+};
+
+const safePowerScalar = (base: unknown, exponent: unknown): unknown =>
+  mul(sign(base as never) as never, pow(abs(base as never) as never, exponent as never));
+
+const boolToFloatMask = (value: unknown): unknown => {
+  const maybeBoolNode = value as { nodeType?: string; select?: (whenTrue: unknown, whenFalse: unknown) => unknown };
+  if (maybeBoolNode?.nodeType === 'bool' && typeof maybeBoolNode.select === 'function') {
+    return maybeBoolNode.select(float(1), float(0));
+  }
+  return float(value as never);
+};
+
+const safePowerNode = (in1: unknown, in2: unknown, outputType?: string): unknown => {
+  if (outputType === 'color4' || outputType === 'vector4') {
+    return vec4(
+      safePowerScalar(getNodeChannel(in1, 0), getNodeChannel(in2, 0)) as never,
+      safePowerScalar(getNodeChannel(in1, 1), getNodeChannel(in2, 1)) as never,
+      safePowerScalar(getNodeChannel(in1, 2), getNodeChannel(in2, 2)) as never,
+      safePowerScalar(getNodeChannel(in1, 3), getNodeChannel(in2, 3)) as never,
+    );
+  }
+  if (outputType === 'color3' || outputType === 'vector3') {
+    return vec3(
+      safePowerScalar(getNodeChannel(in1, 0), getNodeChannel(in2, 0)) as never,
+      safePowerScalar(getNodeChannel(in1, 1), getNodeChannel(in2, 1)) as never,
+      safePowerScalar(getNodeChannel(in1, 2), getNodeChannel(in2, 2)) as never,
+    );
+  }
+  if (outputType === 'vector2') {
+    return vec2(
+      safePowerScalar(getNodeChannel(in1, 0), getNodeChannel(in2, 0)) as never,
+      safePowerScalar(getNodeChannel(in1, 1), getNodeChannel(in2, 1)) as never,
+    );
+  }
+  return safePowerScalar(in1, in2);
+};
+
 const bin =
   (deps: NodeHandlerDeps, left: string, right: string, op: (a: unknown, b: unknown) => unknown): NodeHandler =>
   (node, context, scopeGraph) =>
@@ -135,8 +272,13 @@ export const buildNodeHandlerRegistry = (deps: NodeHandlerDeps): Map<string, Nod
   map.set('gltf_image', (node, context, scopeGraph) => compileGltfImageNode(node, context, scopeGraph));
 
   map.set('gltf_colorimage', (node, context, scopeGraph, outputName) => {
+    const fileInput = readInput(node, 'file');
     const sampled = compileGltfTextureSample(node, context, scopeGraph);
-    const colorCorrected = applyTextureColorSpace(context.document.attributes.colorspace, sampled);
+    const colorCorrected = applyTextureColorSpace(
+      fileInput?.attributes.colorspace,
+      context.document.attributes.colorspace,
+      sampled,
+    );
     const colorFactor = r(node, 'color', vec4(1, 1, 1, 1), context, scopeGraph);
     const geomColor = r(node, 'geomcolor', vec4(1, 1, 1, 1), context, scopeGraph);
     const modulated = mul(mul(colorCorrected as never, colorFactor as never) as never, geomColor as never);
@@ -179,7 +321,7 @@ export const buildNodeHandlerRegistry = (deps: NodeHandlerDeps): Map<string, Nod
     return uv(index);
   });
 
-  map.set('position', () => positionWorld);
+  map.set('position', (node) => (node.attributes.space === 'world' ? positionWorld : positionLocal));
   map.set('normal', () => normalWorld);
   map.set('tangent', () => vec3(1, 0, 0));
   map.set('viewdirection', () => normalize(mul(positionWorld as never, float(-1)) as never));
@@ -187,7 +329,7 @@ export const buildNodeHandlerRegistry = (deps: NodeHandlerDeps): Map<string, Nod
   map.set('normalmap', (node, context, scopeGraph) => {
     const inNode = r(node, 'in', vec3(0.5, 0.5, 1), context, scopeGraph);
     const scaleNode = r(node, 'scale', 1, context, scopeGraph);
-    return normalMap(inNode as never, scaleNode as never);
+    return compileNormalMapVector(inNode, scaleNode);
   });
 
   map.set('heighttonormal', (node, context, scopeGraph) => {
@@ -199,8 +341,7 @@ export const buildNodeHandlerRegistry = (deps: NodeHandlerDeps): Map<string, Nod
   map.set('bump', (node, context, scopeGraph) => {
     const height = r(node, 'height', 0, context, scopeGraph);
     const scaleNode = r(node, 'scale', 1, context, scopeGraph);
-    const normalFromHeight = mx_heighttonormal(height as never, float(1));
-    return normalMap(normalFromHeight as never, scaleNode as never);
+    return normalMap(mx_heighttonormal(height as never, float(1)) as never, scaleNode as never);
   });
 
   map.set('convert', (node, context, scopeGraph) => {
@@ -260,19 +401,19 @@ export const buildNodeHandlerRegistry = (deps: NodeHandlerDeps): Map<string, Nod
   map.set('and', (node, context, scopeGraph) => {
     const in1 = r(node, 'in1', 0, context, scopeGraph);
     const in2 = r(node, 'in2', 0, context, scopeGraph);
-    return clamp(mul(in1 as never, in2 as never) as never, float(0), float(1));
+    return clamp(mul(boolToFloatMask(in1) as never, boolToFloatMask(in2) as never) as never, float(0), float(1));
   });
 
   map.set('or', (node, context, scopeGraph) => {
     const in1 = r(node, 'in1', 0, context, scopeGraph);
     const in2 = r(node, 'in2', 0, context, scopeGraph);
-    return clamp(add(in1 as never, in2 as never) as never, float(0), float(1));
+    return clamp(add(boolToFloatMask(in1) as never, boolToFloatMask(in2) as never) as never, float(0), float(1));
   });
 
   map.set('xor', (node, context, scopeGraph) => {
     const in1 = r(node, 'in1', 0, context, scopeGraph);
     const in2 = r(node, 'in2', 0, context, scopeGraph);
-    return abs(sub(in1 as never, in2 as never) as never);
+    return abs(sub(boolToFloatMask(in1) as never, boolToFloatMask(in2) as never) as never);
   });
 
   map.set('minus', (node, context, scopeGraph) => {
@@ -383,12 +524,14 @@ export const buildNodeHandlerRegistry = (deps: NodeHandlerDeps): Map<string, Nod
     const delta = sub(texcoord as never, center as never);
     const distanceSquared = dot(delta as never, delta as never);
     const radiusSquared = mul(radius as never, radius as never);
-    return mx_ifgreater(distanceSquared as never, radiusSquared as never, float(0) as never, float(1) as never);
+    return mx_ifgreater_materialx(distanceSquared, radiusSquared, float(0), float(1));
   });
 
-  register(
-    map,
-    ['dot', 'dotproduct'],
+  // MaterialX "dot" node is a utility metadata passthrough (input: "in"),
+  // while "dotproduct" is the binary math operation (inputs: "in1"/"in2").
+  map.set('dot', (node, context, scopeGraph) => r(node, 'in', 0, context, scopeGraph));
+  map.set(
+    'dotproduct',
     bin(deps, 'in1', 'in2', (left, right) => dot(left as never, right as never)),
   );
 
@@ -425,17 +568,18 @@ export const buildNodeHandlerRegistry = (deps: NodeHandlerDeps): Map<string, Nod
   map.set('atan2', (node, context, scopeGraph) => {
     const inY = r(node, 'iny', 0, context, scopeGraph);
     const inX = r(node, 'inx', 1, context, scopeGraph);
-    return atan2(inY as never, inX as never);
+    return mx_atan2(inY as never, inX as never);
   });
 
   map.set(
     'power',
     bin(deps, 'in1', 'in2', (left, right) => pow(left as never, right as never)),
   );
-  map.set(
-    'safepower',
-    bin(deps, 'in1', 'in2', (left, right) => mx_safepower(left as never, right as never)),
-  );
+  map.set('safepower', (node, context, scopeGraph) => {
+    const in1 = r(node, 'in1', 0, context, scopeGraph);
+    const in2 = r(node, 'in2', 1, context, scopeGraph);
+    return safePowerNode(in1, in2, node.type);
+  });
   map.set(
     'distance',
     bin(deps, 'in1', 'in2', (left, right) => distance(left as never, right as never)),
@@ -455,7 +599,7 @@ export const buildNodeHandlerRegistry = (deps: NodeHandlerDeps): Map<string, Nod
     const inNode = r(node, 'in', 0, context, scopeGraph);
     const low = r(node, 'low', 0, context, scopeGraph);
     const high = r(node, 'high', 1, context, scopeGraph);
-    return smoothstep(low as never, high as never, inNode as never);
+    return mx_smoothstep_materialx(inNode, low, high);
   });
 
   map.set('saturate', (node, context, scopeGraph) =>
@@ -482,7 +626,8 @@ export const buildNodeHandlerRegistry = (deps: NodeHandlerDeps): Map<string, Nod
     const outLow = r(node, 'outlow', 0, context, scopeGraph);
     const outHigh = r(node, 'outhigh', 1, context, scopeGraph);
     const doClamp = r(node, 'doclamp', false, context, scopeGraph);
-    const remapped = div(sub(inNode as never, inLow as never), sub(inHigh as never, inLow as never));
+    const inSpan = max(sub(inHigh as never, inLow as never) as never, float(1e-6));
+    const remapped = div(sub(inNode as never, inLow as never), inSpan as never);
     const reciprocalGamma = div(float(1), gamma as never);
     const gammaCorrected = mul(
       pow(abs(remapped as never) as never, reciprocalGamma as never),
@@ -490,7 +635,7 @@ export const buildNodeHandlerRegistry = (deps: NodeHandlerDeps): Map<string, Nod
     );
     const scaled = add(outLow as never, mul(gammaCorrected as never, sub(outHigh as never, outLow as never) as never));
     const clamped = clamp(scaled as never, outLow as never, outHigh as never);
-    return mx_ifequal(doClamp as never, float(1) as never, clamped as never, scaled as never);
+    return mx_ifequal_materialx(doClamp, float(1), clamped, scaled);
   });
 
   map.set('open_pbr_anisotropy', (node, context, scopeGraph) => {
@@ -631,27 +776,94 @@ export const buildNodeHandlerRegistry = (deps: NodeHandlerDeps): Map<string, Nod
     return applyMatrixTransform(inNode, matrixNode, 'vector4');
   });
 
-  register(map, ['transformpoint', 'transformvector', 'transformnormal'], (node, context, scopeGraph) =>
-    r(node, 'in', vec3(0, 0, 0), context, scopeGraph),
-  );
+  map.set('transformpoint', (node, context, scopeGraph) => {
+    const inNode = r(node, 'in', vec3(0, 0, 0), context, scopeGraph);
+    const fromSpace = readSpaceInput(node, 'fromspace', 'world');
+    const toSpace = readSpaceInput(node, 'tospace', 'world');
+    return transformPointBetweenSpaces(inNode, fromSpace, toSpace);
+  });
+
+  map.set('transformvector', (node, context, scopeGraph) => {
+    const inNode = r(node, 'in', vec3(0, 0, 0), context, scopeGraph);
+    const fromSpace = readSpaceInput(node, 'fromspace', 'world');
+    const toSpace = readSpaceInput(node, 'tospace', 'world');
+    return transformVectorBetweenSpaces(inNode, fromSpace, toSpace);
+  });
+
+  map.set('transformnormal', (node, context, scopeGraph) => {
+    const inNode = r(node, 'in', vec3(0, 0, 1), context, scopeGraph);
+    const fromSpace = readSpaceInput(node, 'fromspace', 'world');
+    const toSpace = readSpaceInput(node, 'tospace', 'world');
+    return transformNormalBetweenSpaces(inNode, fromSpace, toSpace);
+  });
 
   map.set('rotate2d', (node, context, scopeGraph) => {
     const inNode = r(node, 'in', vec2(0, 0), context, scopeGraph);
     const amount = r(node, 'amount', 0, context, scopeGraph);
-    const pivot = r(node, 'pivot', vec2(0.5, 0.5), context, scopeGraph);
-    const centered = sub(inNode as never, pivot as never);
-    return add(mx_rotate2d(centered as never, amount as never) as never, pivot as never);
+    const rotationRadians = mul(amount as never, float(Math.PI / 180.0) as never);
+    const sa = sin(rotationRadians as never);
+    const ca = cos(rotationRadians as never);
+    const x = getNodeChannel(inNode, 0);
+    const y = getNodeChannel(inNode, 1);
+    return vec2(
+      add(mul(ca as never, x as never) as never, mul(sa as never, y as never) as never),
+      sub(mul(ca as never, y as never) as never, mul(sa as never, x as never) as never),
+    );
   });
 
   map.set('rotate3d', (node, context, scopeGraph) => {
     const inNode = r(node, 'in', vec3(0, 0, 0), context, scopeGraph);
     const amount = r(node, 'amount', 0, context, scopeGraph);
-    const axis = r(node, 'axis', vec3(0, 0, 1), context, scopeGraph);
-    return mx_rotate3d(inNode as never, amount as never, axis as never);
+    const axis = normalize(r(node, 'axis', vec3(0, 1, 0), context, scopeGraph) as never);
+    const rotationRadians = mul(amount as never, float(Math.PI / 180.0) as never);
+    const s = sin(rotationRadians as never);
+    const c = cos(rotationRadians as never);
+    const oc = sub(float(1), c as never);
+
+    const x = getNodeChannel(inNode, 0);
+    const y = getNodeChannel(inNode, 1);
+    const z = getNodeChannel(inNode, 2);
+    const ax = getNodeChannel(axis, 0);
+    const ay = getNodeChannel(axis, 1);
+    const az = getNodeChannel(axis, 2);
+
+    const m00 = add(mul(mul(oc as never, ax as never) as never, ax as never) as never, c as never);
+    const m01 = sub(mul(mul(oc as never, ax as never) as never, ay as never) as never, mul(az as never, s as never) as never);
+    const m02 = add(mul(mul(oc as never, az as never) as never, ax as never) as never, mul(ay as never, s as never) as never);
+
+    const m10 = add(mul(mul(oc as never, ax as never) as never, ay as never) as never, mul(az as never, s as never) as never);
+    const m11 = add(mul(mul(oc as never, ay as never) as never, ay as never) as never, c as never);
+    const m12 = sub(mul(mul(oc as never, ay as never) as never, az as never) as never, mul(ax as never, s as never) as never);
+
+    const m20 = sub(mul(mul(oc as never, az as never) as never, ax as never) as never, mul(ay as never, s as never) as never);
+    const m21 = add(mul(mul(oc as never, ay as never) as never, az as never) as never, mul(ax as never, s as never) as never);
+    const m22 = add(mul(mul(oc as never, az as never) as never, az as never) as never, c as never);
+
+    return vec3(
+      add(
+        add(mul(m00 as never, x as never) as never, mul(m01 as never, y as never) as never) as never,
+        mul(m02 as never, z as never) as never,
+      ),
+      add(
+        add(mul(m10 as never, x as never) as never, mul(m11 as never, y as never) as never) as never,
+        mul(m12 as never, z as never) as never,
+      ),
+      add(
+        add(mul(m20 as never, x as never) as never, mul(m21 as never, y as never) as never) as never,
+        mul(m22 as never, z as never) as never,
+      ),
+    );
   });
 
   map.set('time', () => mx_timer());
-  map.set('frame', () => mx_frame());
+  map.set('frame', (node) => {
+    const frame = mx_frame();
+    // WGSL keeps frame as u32, so cast for float-typed frame nodedefs.
+    if (node.type === 'float') {
+      return float(frame as never);
+    }
+    return frame;
+  });
 
   map.set('ramplr', (node, context, scopeGraph) => {
     const valueL = r(node, 'valuel', 0, context, scopeGraph);
@@ -688,7 +900,7 @@ export const buildNodeHandlerRegistry = (deps: NodeHandlerDeps): Map<string, Nod
     const value2 = r(node, 'value2', 0, context, scopeGraph);
     const in1 = r(node, 'in1', 1, context, scopeGraph);
     const in2 = r(node, 'in2', 0, context, scopeGraph);
-    return mx_ifgreater(value1 as never, value2 as never, in1 as never, in2 as never);
+    return mx_ifgreater_materialx(value1, value2, in1, in2);
   });
 
   map.set('ifgreatereq', (node, context, scopeGraph) => {
@@ -696,7 +908,7 @@ export const buildNodeHandlerRegistry = (deps: NodeHandlerDeps): Map<string, Nod
     const value2 = r(node, 'value2', 0, context, scopeGraph);
     const in1 = r(node, 'in1', 1, context, scopeGraph);
     const in2 = r(node, 'in2', 0, context, scopeGraph);
-    return mx_ifgreatereq(value1 as never, value2 as never, in1 as never, in2 as never);
+    return mx_ifgreatereq_materialx(value1, value2, in1, in2);
   });
 
   map.set('ifequal', (node, context, scopeGraph) => {
@@ -704,7 +916,7 @@ export const buildNodeHandlerRegistry = (deps: NodeHandlerDeps): Map<string, Nod
     const value2 = r(node, 'value2', 0, context, scopeGraph);
     const in1 = r(node, 'in1', 1, context, scopeGraph);
     const in2 = r(node, 'in2', 0, context, scopeGraph);
-    return mx_ifequal(value1 as never, value2 as never, in1 as never, in2 as never);
+    return mx_ifequal_materialx(value1, value2, in1, in2);
   });
 
   map.set('reflect', (node, context, scopeGraph) => {
@@ -882,7 +1094,8 @@ export const buildNodeHandlerRegistry = (deps: NodeHandlerDeps): Map<string, Nod
 
   map.set('blackbody', (node, context, scopeGraph) => {
     const temperature = r(node, 'temperature', 6500, context, scopeGraph);
-    const t = div(float(1000), temperature as never);
+    const temperatureKelvin = clamp(temperature as never, float(800) as never, float(25000) as never);
+    const t = div(float(1000), temperatureKelvin as never);
     const t2 = mul(t as never, t as never);
     const t3 = mul(t2 as never, t as never);
     const lowX = add(
@@ -893,7 +1106,7 @@ export const buildNodeHandlerRegistry = (deps: NodeHandlerDeps): Map<string, Nod
       add(mul(float(-3.0258469), t3 as never) as never, mul(float(2.1070379), t2 as never) as never) as never,
       add(mul(float(0.2226347), t as never) as never, float(0.24039)) as never,
     );
-    const xc = mx_ifgreatereq(temperature as never, float(4000) as never, highX as never, lowX as never);
+    const xc = mx_ifgreatereq_materialx(temperatureKelvin, float(4000), highX, lowX);
     const xc2 = mul(xc as never, xc as never);
     const xc3 = mul(xc2 as never, xc as never);
     const ycLow = add(
@@ -908,8 +1121,8 @@ export const buildNodeHandlerRegistry = (deps: NodeHandlerDeps): Map<string, Nod
       add(mul(float(3.081758), xc3 as never) as never, mul(float(-5.8733867), xc2 as never) as never) as never,
       add(mul(float(3.75112997), xc as never) as never, float(-0.37001483)) as never,
     );
-    const ycLowMid = mx_ifgreatereq(temperature as never, float(2222) as never, ycMid as never, ycLow as never);
-    const yc = mx_ifgreatereq(temperature as never, float(4000) as never, ycHigh as never, ycLowMid as never);
+    const ycLowMid = mx_ifgreatereq_materialx(temperatureKelvin, float(2222), ycMid, ycLow);
+    const yc = mx_ifgreatereq_materialx(temperatureKelvin, float(4000), ycHigh, ycLowMid);
     const safeYc = max(yc as never, float(1e-6));
     const x = div(xc as never, safeYc as never);
     const y = float(1);
@@ -919,26 +1132,28 @@ export const buildNodeHandlerRegistry = (deps: NodeHandlerDeps): Map<string, Nod
       add(
         add(
           mul(float(3.2406), getNodeChannel(xyz, 0) as never) as never,
-          mul(float(-0.9689), getNodeChannel(xyz, 1) as never) as never,
+          mul(float(-1.5372), getNodeChannel(xyz, 1) as never) as never,
         ) as never,
-        mul(float(0.0557), getNodeChannel(xyz, 2) as never) as never,
+        mul(float(-0.4986), getNodeChannel(xyz, 2) as never) as never,
       ) as never,
       add(
         add(
-          mul(float(-1.5372), getNodeChannel(xyz, 0) as never) as never,
+          mul(float(-0.9689), getNodeChannel(xyz, 0) as never) as never,
           mul(float(1.8758), getNodeChannel(xyz, 1) as never) as never,
         ) as never,
-        mul(float(-0.204), getNodeChannel(xyz, 2) as never) as never,
+        mul(float(0.0415), getNodeChannel(xyz, 2) as never) as never,
       ) as never,
       add(
         add(
-          mul(float(-0.4986), getNodeChannel(xyz, 0) as never) as never,
-          mul(float(0.0415), getNodeChannel(xyz, 1) as never) as never,
+          mul(float(0.0557), getNodeChannel(xyz, 0) as never) as never,
+          mul(float(-0.204), getNodeChannel(xyz, 1) as never) as never,
         ) as never,
         mul(float(1.057), getNodeChannel(xyz, 2) as never) as never,
       ) as never,
     );
-    return max(rgb as never, vec3(0, 0, 0) as never);
+    const clampedRgb = max(rgb as never, vec3(0, 0, 0) as never);
+    const validYcMask = step(float(1e-6) as never, yc as never);
+    return mix(vec3(1, 1, 1) as never, clampedRgb as never, validYcMask as never);
   });
 
   map.set('artistic_ior', (node, context, scopeGraph, outputName) => {
@@ -972,7 +1187,7 @@ export const buildNodeHandlerRegistry = (deps: NodeHandlerDeps): Map<string, Nod
 
   map.set('not', (node, context, scopeGraph) => {
     const inNode = r(node, 'in', 0, context, scopeGraph);
-    return sub(float(1), inNode as never);
+    return sub(float(1), boolToFloatMask(inNode) as never);
   });
 
   map.set('ramp4', (node, context, scopeGraph) => {
@@ -986,7 +1201,8 @@ export const buildNodeHandlerRegistry = (deps: NodeHandlerDeps): Map<string, Nod
     const t = getNodeChannel(clamped, 1);
     const topMix = mix(valuetl as never, valuetr as never, s as never);
     const botMix = mix(valuebl as never, valuebr as never, s as never);
-    return mix(botMix as never, topMix as never, t as never);
+    // MaterialXView evaluates the top row at the low edge of t.
+    return mix(topMix as never, botMix as never, t as never);
   });
 
   map.set('ramp_gradient', (node, context, scopeGraph) => {
@@ -1059,7 +1275,7 @@ export const buildNodeHandlerRegistry = (deps: NodeHandlerDeps): Map<string, Nod
     const radialVal = clamp(mul(radialDist as never, float(2)) as never, float(0), float(1));
 
     const circularAngle = add(
-      div(atan2(centered_t as never, centered_s as never) as never, float(Math.PI * 2)) as never,
+      div(mx_atan2(centered_t as never, centered_s as never) as never, float(Math.PI * 2)) as never,
       float(0.5),
     );
 

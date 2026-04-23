@@ -6,6 +6,26 @@ export interface GltfPbrSurfaceInputs {
   getInputNode(node: MaterialXNode, name: string, fallback: unknown): unknown;
 }
 
+const readNumberLiteral = (value: unknown): number | undefined => {
+  if (typeof value === 'number') return value;
+  if (!value || typeof value !== 'object') return undefined;
+  const nodeValue = (value as { value?: unknown }).value;
+  if (typeof nodeValue === 'number') return nodeValue;
+  const nestedNodeValue = (value as { node?: { value?: unknown } }).node?.value;
+  if (typeof nestedNodeValue === 'number') return nestedNodeValue;
+  return undefined;
+};
+
+const isConstNear = (value: unknown, target: number, epsilon = 1e-6): boolean => {
+  const literal = readNumberLiteral(value);
+  if (literal === undefined) return false;
+  return Math.abs(literal - target) <= epsilon;
+};
+
+const isEffectivelyZero = (value: unknown): boolean => isConstNear(value, 0);
+const isEffectivelyOne = (value: unknown): boolean => isConstNear(value, 1);
+const isEnabledWeightNode = (value: unknown): boolean => value !== undefined && value !== null && !isEffectivelyZero(value);
+
 const multiplyNodeValues = (left: unknown, right: unknown): unknown =>
   (left as { mul?: (other: unknown) => unknown }).mul?.(right) ?? mul(left as never, right as never);
 
@@ -48,40 +68,26 @@ export const buildGltfPbrSurfaceAssignments = (
   const metallic = helpers.getInputNode(surfaceNode, 'metallic', 1);
   const normal = helpers.getInputNode(surfaceNode, 'normal', undefined);
   const transmission = hasInput('transmission') ? helpers.getInputNode(surfaceNode, 'transmission', 0) : undefined;
-  const specular = hasInput('specular') ? helpers.getInputNode(surfaceNode, 'specular', 1) : undefined;
-  const specularColor = hasInput('specular_color')
-    ? helpers.getInputNode(surfaceNode, 'specular_color', [1, 1, 1])
-    : undefined;
-  const ior = hasInput('ior') ? helpers.getInputNode(surfaceNode, 'ior', 1.5) : undefined;
+  const specular = helpers.getInputNode(surfaceNode, 'specular', 1);
+  const specularColor = helpers.getInputNode(surfaceNode, 'specular_color', [1, 1, 1]);
+  const ior = helpers.getInputNode(surfaceNode, 'ior', 1.5);
   const alpha = helpers.getInputNode(surfaceNode, 'alpha', 1);
   const alphaMode = helpers.getInputNode(surfaceNode, 'alpha_mode', 0);
   const alphaCutoff = helpers.getInputNode(surfaceNode, 'alpha_cutoff', 0.5);
-  const iridescence = hasInput('iridescence') ? helpers.getInputNode(surfaceNode, 'iridescence', 0) : undefined;
-  const iridescenceIor = hasInput('iridescence_ior')
-    ? helpers.getInputNode(surfaceNode, 'iridescence_ior', 1.3)
-    : undefined;
-  const iridescenceThickness = hasInput('iridescence_thickness')
-    ? helpers.getInputNode(surfaceNode, 'iridescence_thickness', 300)
-    : undefined;
-  const sheenColor = hasInput('sheen_color') ? helpers.getInputNode(surfaceNode, 'sheen_color', [0, 0, 0]) : undefined;
-  const sheenRoughness = hasInput('sheen_roughness')
-    ? helpers.getInputNode(surfaceNode, 'sheen_roughness', 0)
-    : undefined;
-  const clearcoat = hasInput('clearcoat') ? helpers.getInputNode(surfaceNode, 'clearcoat', 0) : undefined;
-  const clearcoatRoughness = hasInput('clearcoat_roughness')
-    ? helpers.getInputNode(surfaceNode, 'clearcoat_roughness', 0)
-    : undefined;
-  const clearcoatNormal = hasInput('clearcoat_normal')
-    ? helpers.getInputNode(surfaceNode, 'clearcoat_normal', undefined)
-    : undefined;
+  const iridescence = helpers.getInputNode(surfaceNode, 'iridescence', 0);
+  const iridescenceIor = helpers.getInputNode(surfaceNode, 'iridescence_ior', 1.3);
+  const iridescenceThickness = helpers.getInputNode(surfaceNode, 'iridescence_thickness', 100);
+  const sheenColor = helpers.getInputNode(surfaceNode, 'sheen_color', [0, 0, 0]);
+  const sheenRoughness = helpers.getInputNode(surfaceNode, 'sheen_roughness', 0);
+  const clearcoat = helpers.getInputNode(surfaceNode, 'clearcoat', 0);
+  const clearcoatRoughness = helpers.getInputNode(surfaceNode, 'clearcoat_roughness', 0);
+  const clearcoatNormal = helpers.getInputNode(surfaceNode, 'clearcoat_normal', undefined);
   const emissiveColor = helpers.getInputNode(surfaceNode, 'emissive', [0, 0, 0]);
   const emissiveStrength = helpers.getInputNode(surfaceNode, 'emissive_strength', 1);
   const attenuationDistance = hasInput('attenuation_distance')
     ? helpers.getInputNode(surfaceNode, 'attenuation_distance', undefined)
     : undefined;
-  const attenuationColor = hasInput('attenuation_color')
-    ? helpers.getInputNode(surfaceNode, 'attenuation_color', [1, 1, 1])
-    : undefined;
+  const attenuationColor = helpers.getInputNode(surfaceNode, 'attenuation_color', [1, 1, 1]);
   const thickness = hasInput('thickness') ? helpers.getInputNode(surfaceNode, 'thickness', 0) : undefined;
   const dispersion = hasInput('dispersion') ? helpers.getInputNode(surfaceNode, 'dispersion', 0) : undefined;
   const anisotropyStrength = hasInput('anisotropy_strength')
@@ -95,32 +101,49 @@ export const buildGltfPbrSurfaceAssignments = (
   const opacityNode = buildOpacityNode(alpha, alphaMode, alphaCutoff);
   const attenuationDistanceNode = toAttenuationDistance(attenuationDistance, hasInput('attenuation_color'));
   const iridescenceThicknessNode = toIridescenceThicknessNode(iridescenceThickness);
+  const transmissionEnabled = isEnabledWeightNode(transmission);
+  const clearcoatEnabled = isEnabledWeightNode(clearcoat);
+  const sheenEnabled = hasInput('sheen_color') || isEnabledWeightNode(sheenRoughness);
+  const iridescenceEnabled = isEnabledWeightNode(iridescence);
+  const anisotropyEnabled = !isEffectivelyZero(anisotropyStrength) || !isEffectivelyZero(anisotropyRotation);
 
-  return {
+  const assignments: MaterialSlotAssignments = {
     colorNode: baseColor,
     aoNode: occlusion,
     roughnessNode: roughness,
     metalnessNode: metallic,
-    specularIntensityNode: specular,
     specularColorNode: specularColor,
-    anisotropyNode: anisotropyStrength,
-    anisotropyRotation,
-    clearcoatNode: clearcoat,
-    clearcoatRoughnessNode: clearcoatRoughness,
-    clearcoatNormalNode: clearcoatNormal,
-    sheenNode: sheenColor,
-    sheenRoughnessNode: sheenRoughness,
     normalNode: normal,
     emissiveNode,
-    opacityNode,
-    transmissionNode: transmission,
-    thicknessNode: thickness,
-    dispersionNode: dispersion,
     attenuationColorNode: attenuationColor,
     attenuationDistanceNode,
-    iorNode: ior,
-    iridescenceNode: iridescence,
-    iridescenceIORNode: iridescenceIor,
-    iridescenceThicknessNode,
   };
+
+  if (!isEffectivelyOne(specular)) assignments.specularIntensityNode = specular;
+  if (!isConstNear(ior, 1.5)) assignments.iorNode = ior;
+  if (!isEffectivelyOne(opacityNode)) assignments.opacityNode = opacityNode;
+  if (anisotropyEnabled) {
+    assignments.anisotropyNode = anisotropyStrength;
+    assignments.anisotropyRotation = anisotropyRotation;
+  }
+  if (clearcoatEnabled) {
+    assignments.clearcoatNode = clearcoat;
+    if (!isEffectivelyZero(clearcoatRoughness)) assignments.clearcoatRoughnessNode = clearcoatRoughness;
+    assignments.clearcoatNormalNode = clearcoatNormal;
+  }
+  if (sheenEnabled) {
+    assignments.sheenNode = sheenColor;
+    assignments.sheenColorNode = sheenColor;
+    if (!isEffectivelyZero(sheenRoughness)) assignments.sheenRoughnessNode = sheenRoughness;
+  }
+  if (transmissionEnabled) assignments.transmissionNode = transmission;
+  if (thickness !== undefined && !isEffectivelyZero(thickness)) assignments.thicknessNode = thickness;
+  if (dispersion !== undefined && !isEffectivelyZero(dispersion)) assignments.dispersionNode = dispersion;
+  if (iridescenceEnabled) {
+    assignments.iridescenceNode = iridescence;
+    if (!isConstNear(iridescenceIor, 1.3)) assignments.iridescenceIORNode = iridescenceIor;
+    if (!isConstNear(iridescenceThicknessNode, 100)) assignments.iridescenceThicknessNode = iridescenceThicknessNode;
+  }
+
+  return assignments;
 };
