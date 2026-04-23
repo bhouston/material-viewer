@@ -9,7 +9,22 @@ import { nitro } from 'nitro/vite';
 
 const config = defineConfig({
   resolve: { tsconfigPaths: true },
-  plugins: [nitro(), devtools(), tailwindcss(), tanstackStart(), viteReact()],
+  plugins: [
+    nitro({
+      preset: 'node-server',
+      routeRules: {
+        '/assets/**': {
+          headers: {
+            'cache-control': 'public, max-age=31536000, immutable',
+          },
+        },
+      },
+    }),
+    devtools(),
+    tailwindcss(),
+    tanstackStart(),
+    viteReact(),
+  ],
 });
 
 export default config;
