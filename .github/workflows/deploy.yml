@@ -7,10 +7,10 @@ on:
 
 jobs:
   deploy:
-    name: Deploy materialx-viewer to Cloud Run
+    name: Deploy to Cloud Run
     uses: ./.github/workflows/deploy-service.yml
     with:
-      service_name: materialx-viewer
+      service_name: material-viewer
       dockerfile: apps/viewer/Dockerfile
       context: .
     secrets:
