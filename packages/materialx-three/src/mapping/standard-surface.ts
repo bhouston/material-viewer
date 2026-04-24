@@ -1,5 +1,5 @@
 import type { MaterialXNode } from '@material-viewer/materialx';
-import { clamp, float, mul, mix, transformNormalToView } from 'three/tsl';
+import { clamp, float, mul, mix } from 'three/tsl';
 import type { MaterialSlotAssignments } from '../types.js';
 
 export interface StandardSurfaceInputs {
@@ -112,7 +112,7 @@ export const buildStandardSurfaceAssignments = (
     roughnessNode: roughness,
     specularColorNode: specularColor,
     emissiveNode,
-    normalNode: normal !== undefined ? transformNormalToView(normal as never) : undefined,
+    normalNode: normal,
   };
 
   if (!isEffectivelyZero(metalness)) assignments.metalnessNode = metalness;
