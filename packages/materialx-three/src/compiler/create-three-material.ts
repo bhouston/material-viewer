@@ -1,6 +1,6 @@
 import type { MaterialXDocument } from '@material-viewer/materialx';
 import { Color } from 'three';
-import { cos, float, mul, sin, vec2 } from 'three/tsl';
+import { cos, float, mul, sin, transformNormalToView, vec2 } from 'three/tsl';
 import { DoubleSide, MeshPhysicalNodeMaterial } from 'three/webgpu';
 import type { MaterialXThreeCompileOptions, MaterialXThreeCompileResult } from '../types.js';
 import { compileMaterialXToTSL } from './compile-material.js';
@@ -44,6 +44,12 @@ export const createThreeMaterialFromDocument = (
   const materialWithExtraNodes = material as MeshPhysicalNodeMaterial & {
     transmissionColorNode?: unknown;
   };
+  const toViewNormalNode = (value: unknown): unknown => {
+    if (value === undefined || value === null) {
+      return value;
+    }
+    return transformNormalToView(value as never);
+  };
 
   material.color = new Color(1, 1, 1);
   material.colorNode = result.assignments.colorNode as never;
@@ -82,10 +88,10 @@ export const createThreeMaterialFromDocument = (
   }
   material.clearcoatNode = result.assignments.clearcoatNode as never;
   material.clearcoatRoughnessNode = result.assignments.clearcoatRoughnessNode as never;
-  material.clearcoatNormalNode = result.assignments.clearcoatNormalNode as never;
+  material.clearcoatNormalNode = toViewNormalNode(result.assignments.clearcoatNormalNode) as never;
   material.sheenNode = result.assignments.sheenNode as never;
   material.sheenRoughnessNode = result.assignments.sheenRoughnessNode as never;
-  material.normalNode = result.assignments.normalNode as never;
+  material.normalNode = toViewNormalNode(result.assignments.normalNode) as never;
   material.emissiveNode = result.assignments.emissiveNode as never;
   material.opacityNode = opacityAssignment as never;
   const shouldUseOpacityBlending = isAlphaBlendMode || gltfAlphaMode === undefined;

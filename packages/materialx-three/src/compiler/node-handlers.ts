@@ -132,19 +132,6 @@ const mx_smoothstep_materialx = (inNode: unknown, low: unknown, high: unknown): 
   return mix(hermite as never, fallback as never, useFallback as never);
 };
 
-const compileNormalMapVector = (sampledNormal: unknown, scaleNode: unknown): unknown => {
-  // Keep normalmap node usable in arbitrary graphs (e.g. wired into base_color)
-  // without depending on view-space matrix nodes that are only valid in normal slots.
-  const tangentNormal = sub(mul(sampledNormal as never, vec3(2, 2, 2) as never) as never, vec3(1, 1, 1) as never);
-  return normalize(
-    vec3(
-      mul(getNodeChannel(tangentNormal, 0) as never, scaleNode as never),
-      mul(getNodeChannel(tangentNormal, 1) as never, scaleNode as never),
-      getNodeChannel(tangentNormal, 2) as never,
-    ) as never,
-  );
-};
-
 const normalizeSpaceName = (value: unknown): 'object' | 'world' => {
   if (typeof value !== 'string') {
     return 'world';
@@ -335,7 +322,7 @@ export const buildNodeHandlerRegistry = (deps: NodeHandlerDeps): Map<string, Nod
   map.set('normalmap', (node, context, scopeGraph) => {
     const inNode = r(node, 'in', vec3(0.5, 0.5, 1), context, scopeGraph);
     const scaleNode = r(node, 'scale', 1, context, scopeGraph);
-    return compileNormalMapVector(inNode, scaleNode);
+    return normalMap(inNode as never, scaleNode as never);
   });
 
   map.set('heighttonormal', (node, context, scopeGraph) => {
