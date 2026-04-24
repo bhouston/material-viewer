@@ -36,7 +36,6 @@ import {
   mx_ifgreatereq,
   mx_atan2,
   mx_noise_float,
-  mx_place2d,
   mx_ramplr,
   mx_ramptb,
   mx_rgbtohsv,
@@ -205,6 +204,49 @@ const transformNormalBetweenSpaces = (
 
 const safePowerScalar = (base: unknown, exponent: unknown): unknown =>
   mul(sign(base as never) as never, pow(abs(base as never) as never, exponent as never));
+
+const rotate2dMaterialX = (inNode: unknown, amount: unknown): unknown => {
+  const rotationRadians = mul(sub(float(0), amount as never) as never, float(Math.PI / 180.0) as never);
+  const sa = sin(rotationRadians as never);
+  const ca = cos(rotationRadians as never);
+  const x = getNodeChannel(inNode, 0);
+  const y = getNodeChannel(inNode, 1);
+  return vec2(
+    add(mul(ca as never, x as never) as never, mul(sa as never, y as never) as never),
+    sub(mul(ca as never, y as never) as never, mul(sa as never, x as never) as never),
+  );
+};
+
+const place2dMaterialX = (
+  texcoord: unknown,
+  pivot: unknown,
+  scaleNode: unknown,
+  rotate: unknown,
+  offset: unknown,
+  operationorder: unknown,
+): unknown => {
+  const pivotAdjusted = vec2(
+    getNodeChannel(pivot, 0) as never,
+    sub(float(1), getNodeChannel(pivot, 1) as never) as never,
+  );
+  const offsetAdjusted = vec2(
+    getNodeChannel(offset, 0) as never,
+    sub(float(0), getNodeChannel(offset, 1) as never) as never,
+  );
+  const centered = sub(texcoord as never, pivotAdjusted as never);
+  const srt = add(
+    sub(rotate2dMaterialX(div(centered as never, scaleNode as never), rotate) as never, offsetAdjusted as never),
+    pivotAdjusted as never,
+  );
+  const trs = add(
+    div(rotate2dMaterialX(sub(centered as never, offsetAdjusted as never), rotate) as never, scaleNode as never),
+    pivotAdjusted as never,
+  );
+  if (typeof operationorder === 'number') {
+    return Math.abs(operationorder) > Number.EPSILON ? trs : srt;
+  }
+  return mix(srt as never, trs as never, step(float(0.5), float(operationorder as never)) as never);
+};
 
 const boolToFloatMask = (value: unknown): unknown => {
   const maybeBoolNode = value as { nodeType?: string; select?: (whenTrue: unknown, whenFalse: unknown) => unknown };
@@ -742,11 +784,12 @@ export const buildNodeHandlerRegistry = (deps: NodeHandlerDeps): Map<string, Nod
 
   map.set('place2d', (node, context, scopeGraph) => {
     const texcoord = r(node, 'texcoord', uv(0), context, scopeGraph);
-    const pivot = r(node, 'pivot', vec2(0.5, 0.5), context, scopeGraph);
+    const pivot = r(node, 'pivot', vec2(0, 0), context, scopeGraph);
     const scaleNode = r(node, 'scale', vec2(1, 1), context, scopeGraph);
     const rotate = r(node, 'rotate', 0, context, scopeGraph);
     const offset = r(node, 'offset', vec2(0, 0), context, scopeGraph);
-    return mx_place2d(texcoord as never, pivot as never, scaleNode as never, rotate as never, offset as never);
+    const operationOrder = r(node, 'operationorder', 0, context, scopeGraph);
+    return place2dMaterialX(texcoord, pivot, scaleNode, rotate, offset, operationOrder);
   });
 
   map.set('transformmatrix', (node, context, scopeGraph) => {
@@ -793,22 +836,14 @@ export const buildNodeHandlerRegistry = (deps: NodeHandlerDeps): Map<string, Nod
   map.set('rotate2d', (node, context, scopeGraph) => {
     const inNode = r(node, 'in', vec2(0, 0), context, scopeGraph);
     const amount = r(node, 'amount', 0, context, scopeGraph);
-    const rotationRadians = mul(amount as never, float(Math.PI / 180.0) as never);
-    const sa = sin(rotationRadians as never);
-    const ca = cos(rotationRadians as never);
-    const x = getNodeChannel(inNode, 0);
-    const y = getNodeChannel(inNode, 1);
-    return vec2(
-      add(mul(ca as never, x as never) as never, mul(sa as never, y as never) as never),
-      sub(mul(ca as never, y as never) as never, mul(sa as never, x as never) as never),
-    );
+    return rotate2dMaterialX(inNode, amount);
   });
 
   map.set('rotate3d', (node, context, scopeGraph) => {
     const inNode = r(node, 'in', vec3(0, 0, 0), context, scopeGraph);
     const amount = r(node, 'amount', 0, context, scopeGraph);
     const axis = normalize(r(node, 'axis', vec3(0, 1, 0), context, scopeGraph) as never);
-    const rotationRadians = mul(amount as never, float(Math.PI / 180.0) as never);
+    const rotationRadians = mul(sub(float(0), amount as never) as never, float(Math.PI / 180.0) as never);
     const s = sin(rotationRadians as never);
     const c = cos(rotationRadians as never);
     const oc = sub(float(1), c as never);

@@ -11,7 +11,6 @@ import {
   max,
   mix,
   mul,
-  mx_place2d,
   pow,
   sin,
   cos,
@@ -113,6 +112,49 @@ const mxRotate2d = (point: unknown, sine: unknown, cosine: unknown): unknown =>
       mul(cosine as never, element(point as never, 1 as never) as never) as never,
     ) as never,
   );
+
+const rotate2dMaterialX = (inNode: unknown, amount: unknown): unknown => {
+  const rotationRadians = mul(sub(0 as never, amount as never) as never, Math.PI / 180.0 as never);
+  const sa = sin(rotationRadians as never);
+  const ca = cos(rotationRadians as never);
+  const x = element(inNode as never, 0 as never);
+  const y = element(inNode as never, 1 as never);
+  return vec2(
+    add(mul(ca as never, x as never) as never, mul(sa as never, y as never) as never) as never,
+    sub(mul(ca as never, y as never) as never, mul(sa as never, x as never) as never) as never,
+  );
+};
+
+const place2dMaterialX = (
+  texcoord: unknown,
+  pivot: unknown,
+  scaleNode: unknown,
+  rotate: unknown,
+  offset: unknown,
+  operationorder: unknown,
+): unknown => {
+  const pivotAdjusted = vec2(
+    element(pivot as never, 0 as never) as never,
+    sub(1 as never, element(pivot as never, 1 as never) as never) as never,
+  );
+  const offsetAdjusted = vec2(
+    element(offset as never, 0 as never) as never,
+    sub(0 as never, element(offset as never, 1 as never) as never) as never,
+  );
+  const centered = sub(texcoord as never, pivotAdjusted as never);
+  const srt = add(
+    sub(rotate2dMaterialX(div(centered as never, scaleNode as never), rotate) as never, offsetAdjusted as never),
+    pivotAdjusted as never,
+  );
+  const trs = add(
+    div(rotate2dMaterialX(sub(centered as never, offsetAdjusted as never), rotate) as never, scaleNode as never),
+    pivotAdjusted as never,
+  );
+  if (typeof operationorder === 'number') {
+    return Math.abs(operationorder) > Number.EPSILON ? trs : srt;
+  }
+  return mix(srt as never, trs as never, step(0.5 as never, operationorder as never) as never);
+};
 
 const mxHextileCoord = (
   coord: unknown,
@@ -283,22 +325,12 @@ export const createTextureNodeCompiler = ({ resolveInputNode, readInput, warn, t
     const rotate = resolveInputNode(node, 'rotate', 0, context, scopeGraph);
     const offset = resolveInputNode(node, 'offset', vec2(0, 0), context, scopeGraph);
     const operationOrderInput = readInput(node, 'operationorder');
-    const operationOrder = toScalar(operationOrderInput?.value ?? operationOrderInput?.attributes.value);
-    if (operationOrder !== undefined && Math.abs(operationOrder) > Number.EPSILON) {
-      warn(context, {
-        code: 'unsupported-node',
-        category: node.category,
-        nodeName: node.name,
-        message: `Texture transform operationorder on "${node.name ?? node.category}" is not yet honored`,
-      });
-    }
-    const transformedUv = mx_place2d(
-      texcoord as never,
-      pivot as never,
-      scaleNode as never,
-      rotate as never,
-      offset as never,
-    );
+    const operationOrderScalar = toScalar(operationOrderInput?.value ?? operationOrderInput?.attributes.value);
+    const operationOrder =
+      operationOrderScalar === undefined
+        ? resolveInputNode(node, 'operationorder', 0, context, scopeGraph)
+        : operationOrderScalar;
+    const transformedUv = place2dMaterialX(texcoord, pivot, scaleNode, rotate, offset, operationOrder);
 
     const textureResolver =
       context.options.textureResolver ?? createTextureResolver({ basePath: context.options.basePath });
