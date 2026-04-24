@@ -114,7 +114,7 @@ const mxRotate2d = (point: unknown, sine: unknown, cosine: unknown): unknown =>
   );
 
 const rotate2dMaterialX = (inNode: unknown, amount: unknown): unknown => {
-  const rotationRadians = mul(sub(0 as never, amount as never) as never, Math.PI / 180.0 as never);
+  const rotationRadians = mul(amount as never, Math.PI / 180.0 as never);
   const sa = sin(rotationRadians as never);
   const ca = cos(rotationRadians as never);
   const x = element(inNode as never, 0 as never);
@@ -133,28 +133,32 @@ const place2dMaterialX = (
   offset: unknown,
   operationorder: unknown,
 ): unknown => {
-  const pivotAdjusted = vec2(
-    element(pivot as never, 0 as never) as never,
-    sub(1 as never, element(pivot as never, 1 as never) as never) as never,
-  );
-  const offsetAdjusted = vec2(
-    element(offset as never, 0 as never) as never,
-    sub(0 as never, element(offset as never, 1 as never) as never) as never,
-  );
-  const centered = sub(texcoord as never, pivotAdjusted as never);
+  const centered = sub(texcoord as never, pivot as never);
   const srt = add(
-    sub(rotate2dMaterialX(div(centered as never, scaleNode as never), rotate) as never, offsetAdjusted as never),
-    pivotAdjusted as never,
+    sub(rotate2dMaterialX(div(centered as never, scaleNode as never), rotate) as never, offset as never),
+    pivot as never,
   );
   const trs = add(
-    div(rotate2dMaterialX(sub(centered as never, offsetAdjusted as never), rotate) as never, scaleNode as never),
-    pivotAdjusted as never,
+    div(rotate2dMaterialX(sub(centered as never, offset as never), rotate) as never, scaleNode as never),
+    pivot as never,
   );
   if (typeof operationorder === 'number') {
     return Math.abs(operationorder) > Number.EPSILON ? trs : srt;
   }
   return mix(srt as never, trs as never, step(0.5 as never, operationorder as never) as never);
 };
+
+const mxToUvSpace = (uvNode: unknown): unknown =>
+  vec2(
+    element(uvNode as never, 0 as never) as never,
+    sub(1 as never, element(uvNode as never, 1 as never) as never) as never,
+  );
+
+const mxFromUvSpace = (uvNode: unknown): unknown =>
+  vec2(
+    element(uvNode as never, 0 as never) as never,
+    sub(1 as never, element(uvNode as never, 1 as never) as never) as never,
+  );
 
 const mxHextileCoord = (
   coord: unknown,
@@ -284,7 +288,7 @@ export const createTextureNodeCompiler = ({ resolveInputNode, readInput, warn, t
       return vec4(0, 0, 0, 1);
     }
 
-    const uvNode = resolveInputNode(node, 'texcoord', uv(0), context, scopeGraph);
+    const uvNode = resolveInputNode(node, 'texcoord', mxToUvSpace(uv(0)), context, scopeGraph);
     const uvTiling = resolveInputNode(node, 'uvtiling', vec2(1, 1), context, scopeGraph);
     const uvOffset = resolveInputNode(node, 'uvoffset', vec2(0, 0), context, scopeGraph);
     const transformedUv =
@@ -293,7 +297,7 @@ export const createTextureNodeCompiler = ({ resolveInputNode, readInput, warn, t
     const textureResolver =
       context.options.textureResolver ?? createTextureResolver({ basePath: context.options.basePath });
     const tex = textureResolver.resolve(uri, { document: context.document, node });
-    const sampled = texture(tex, transformedUv as never);
+    const sampled = texture(tex, mxFromUvSpace(transformedUv) as never);
     const colorCorrected = applyTextureColorSpace(
       fileInput?.attributes.colorspace,
       context.document.attributes.colorspace,
@@ -319,7 +323,7 @@ export const createTextureNodeCompiler = ({ resolveInputNode, readInput, warn, t
       return vec4(0, 0, 0, 1);
     }
 
-    const texcoord = resolveInputNode(node, 'texcoord', uv(0), context, scopeGraph);
+    const texcoord = resolveInputNode(node, 'texcoord', mxToUvSpace(uv(0)), context, scopeGraph);
     const pivot = resolveInputNode(node, 'pivot', vec2(0, 0), context, scopeGraph);
     const scaleNode = resolveInputNode(node, 'scale', vec2(1, 1), context, scopeGraph);
     const rotate = resolveInputNode(node, 'rotate', 0, context, scopeGraph);
@@ -335,7 +339,7 @@ export const createTextureNodeCompiler = ({ resolveInputNode, readInput, warn, t
     const textureResolver =
       context.options.textureResolver ?? createTextureResolver({ basePath: context.options.basePath });
     const tex = textureResolver.resolve(uri, { document: context.document, node });
-    return texture(tex, transformedUv as never);
+    return texture(tex, mxFromUvSpace(transformedUv) as never);
   };
 
   const compileGltfImageNode = (
@@ -376,7 +380,7 @@ export const createTextureNodeCompiler = ({ resolveInputNode, readInput, warn, t
       return vec4(0, 0, 0, 1);
     }
 
-    const uvNode = resolveInputNode(node, 'texcoord', uv(0), context, scopeGraph);
+    const uvNode = resolveInputNode(node, 'texcoord', mxToUvSpace(uv(0)), context, scopeGraph);
     const tiling = resolveInputNode(node, 'tiling', vec2(1, 1), context, scopeGraph);
     const rotation = resolveInputNode(node, 'rotation', 1, context, scopeGraph);
     const rotationRange = resolveInputNode(node, 'rotationrange', vec2(0, 360), context, scopeGraph);
@@ -393,9 +397,9 @@ export const createTextureNodeCompiler = ({ resolveInputNode, readInput, warn, t
       context.options.textureResolver ?? createTextureResolver({ basePath: context.options.basePath });
     const tex = textureResolver.resolve(uri, { document: context.document, node });
     const tileData = mxHextileCoord(transformedUv, rotation, rotationRange, scale, scaleRange, offset, offsetRange);
-    const sample0Raw = texture(tex, tileData.coords[0] as never);
-    const sample1Raw = texture(tex, tileData.coords[1] as never);
-    const sample2Raw = texture(tex, tileData.coords[2] as never);
+    const sample0Raw = texture(tex, mxFromUvSpace(tileData.coords[0]) as never);
+    const sample1Raw = texture(tex, mxFromUvSpace(tileData.coords[1]) as never);
+    const sample2Raw = texture(tex, mxFromUvSpace(tileData.coords[2]) as never);
     const sample0 = applyTextureColorSpace(
       fileInput?.attributes.colorspace,
       context.document.attributes.colorspace,

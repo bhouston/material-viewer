@@ -74,7 +74,6 @@ import { parseFloatValue } from '../runtime/value-parsing.js';
 import { compileBinaryMath } from './binary-math.js';
 import type { CompileContext, MatrixValue, NodeHandler } from './internal-types.js';
 import { readInput } from './inputs.js';
-import { resolveInputReference } from '../graph/resolve.js';
 import {
   applyMatrixTransform,
   det3,
@@ -207,7 +206,7 @@ const safePowerScalar = (base: unknown, exponent: unknown): unknown =>
   mul(sign(base as never) as never, pow(abs(base as never) as never, exponent as never));
 
 const rotate2dMaterialX = (inNode: unknown, amount: unknown): unknown => {
-  const rotationRadians = mul(sub(float(0), amount as never) as never, float(Math.PI / 180.0) as never);
+  const rotationRadians = mul(amount as never, float(Math.PI / 180.0) as never);
   const sa = sin(rotationRadians as never);
   const ca = cos(rotationRadians as never);
   const x = getNodeChannel(inNode, 0);
@@ -226,28 +225,26 @@ const place2dMaterialX = (
   offset: unknown,
   operationorder: unknown,
 ): unknown => {
-  const pivotAdjusted = vec2(
-    getNodeChannel(pivot, 0) as never,
-    sub(float(1), getNodeChannel(pivot, 1) as never) as never,
-  );
-  const offsetAdjusted = vec2(
-    getNodeChannel(offset, 0) as never,
-    sub(float(0), getNodeChannel(offset, 1) as never) as never,
-  );
-  const centered = sub(texcoord as never, pivotAdjusted as never);
+  const centered = sub(texcoord as never, pivot as never);
   const srt = add(
-    sub(rotate2dMaterialX(div(centered as never, scaleNode as never), rotate) as never, offsetAdjusted as never),
-    pivotAdjusted as never,
+    sub(rotate2dMaterialX(div(centered as never, scaleNode as never), rotate) as never, offset as never),
+    pivot as never,
   );
   const trs = add(
-    div(rotate2dMaterialX(sub(centered as never, offsetAdjusted as never), rotate) as never, scaleNode as never),
-    pivotAdjusted as never,
+    div(rotate2dMaterialX(sub(centered as never, offset as never), rotate) as never, scaleNode as never),
+    pivot as never,
   );
   if (typeof operationorder === 'number') {
     return Math.abs(operationorder) > Number.EPSILON ? trs : srt;
   }
   return mix(srt as never, trs as never, step(float(0.5), float(operationorder as never)) as never);
 };
+
+const mxToUvSpace = (uvNode: unknown): unknown =>
+  vec2(
+    getNodeChannel(uvNode, 0) as never,
+    sub(float(1), getNodeChannel(uvNode, 1) as never) as never,
+  );
 
 const boolToFloatMask = (value: unknown): unknown => {
   const maybeBoolNode = value as { nodeType?: string; select?: (whenTrue: unknown, whenFalse: unknown) => unknown };
@@ -351,7 +348,7 @@ export const buildNodeHandlerRegistry = (deps: NodeHandlerDeps): Map<string, Nod
   map.set('texcoord', (node) => {
     const indexInput = readInput(node, 'index');
     const index = parseFloatValue(indexInput?.value ?? indexInput?.attributes.value, 0);
-    return uv(index);
+    return mxToUvSpace(uv(index));
   });
 
   map.set('position', (node) => (node.attributes.space === 'world' ? positionWorld : positionLocal));
@@ -545,7 +542,7 @@ export const buildNodeHandlerRegistry = (deps: NodeHandlerDeps): Map<string, Nod
   map.set('checkerboard', (node, context, scopeGraph) => {
     const color1 = r(node, 'color1', vec3(1, 1, 1), context, scopeGraph);
     const color2 = r(node, 'color2', vec3(0, 0, 0), context, scopeGraph);
-    const texcoord = r(node, 'texcoord', uv(0), context, scopeGraph);
+    const texcoord = r(node, 'texcoord', mxToUvSpace(uv(0)), context, scopeGraph);
     const uvTiling = r(node, 'uvtiling', vec2(8, 8), context, scopeGraph);
     const uvOffset = r(node, 'uvoffset', vec2(0, 0), context, scopeGraph);
     const transformedUv = add(mul(texcoord as never, uvTiling as never), uvOffset as never);
@@ -554,7 +551,7 @@ export const buildNodeHandlerRegistry = (deps: NodeHandlerDeps): Map<string, Nod
   });
 
   map.set('circle', (node, context, scopeGraph) => {
-    const texcoord = r(node, 'texcoord', uv(0), context, scopeGraph);
+    const texcoord = r(node, 'texcoord', mxToUvSpace(uv(0)), context, scopeGraph);
     const center = r(node, 'center', vec2(0.5, 0.5), context, scopeGraph);
     const radius = r(node, 'radius', 0.5, context, scopeGraph);
     const delta = sub(texcoord as never, center as never);
@@ -784,7 +781,7 @@ export const buildNodeHandlerRegistry = (deps: NodeHandlerDeps): Map<string, Nod
   });
 
   map.set('place2d', (node, context, scopeGraph) => {
-    const texcoord = r(node, 'texcoord', uv(0), context, scopeGraph);
+    const texcoord = r(node, 'texcoord', mxToUvSpace(uv(0)), context, scopeGraph);
     const pivot = r(node, 'pivot', vec2(0, 0), context, scopeGraph);
     const scaleNode = r(node, 'scale', vec2(1, 1), context, scopeGraph);
     const rotate = r(node, 'rotate', 0, context, scopeGraph);
@@ -837,16 +834,7 @@ export const buildNodeHandlerRegistry = (deps: NodeHandlerDeps): Map<string, Nod
   map.set('rotate2d', (node, context, scopeGraph) => {
     const inNode = r(node, 'in', vec2(0, 0), context, scopeGraph);
     const amount = r(node, 'amount', 0, context, scopeGraph);
-    const inInput = readInput(node, 'in');
-    const inReference = inInput ? resolveInputReference(inInput, scopeGraph, context.index) : undefined;
-    const isDirectTexcoord = inReference?.fromNode?.category === 'texcoord';
-    if (!isDirectTexcoord) {
-      return rotate2dMaterialX(inNode, amount);
-    }
-
-    const pivotAdjusted = vec2(0, 1);
-    const centered = sub(inNode as never, pivotAdjusted as never);
-    return add(rotate2dMaterialX(centered, amount) as never, pivotAdjusted as never);
+    return rotate2dMaterialX(inNode, amount);
   });
 
   map.set('rotate3d', (node, context, scopeGraph) => {
@@ -906,14 +894,14 @@ export const buildNodeHandlerRegistry = (deps: NodeHandlerDeps): Map<string, Nod
   map.set('ramplr', (node, context, scopeGraph) => {
     const valueL = r(node, 'valuel', 0, context, scopeGraph);
     const valueR = r(node, 'valuer', 0, context, scopeGraph);
-    const texcoord = r(node, 'texcoord', uv(0), context, scopeGraph);
+    const texcoord = r(node, 'texcoord', mxToUvSpace(uv(0)), context, scopeGraph);
     return mx_ramplr(valueL as never, valueR as never, texcoord as never);
   });
 
   map.set('ramptb', (node, context, scopeGraph) => {
     const valueT = r(node, 'valuet', 0, context, scopeGraph);
     const valueB = r(node, 'valueb', 0, context, scopeGraph);
-    const texcoord = r(node, 'texcoord', uv(0), context, scopeGraph);
+    const texcoord = r(node, 'texcoord', mxToUvSpace(uv(0)), context, scopeGraph);
     return mx_ramptb(valueT as never, valueB as never, texcoord as never);
   });
 
@@ -921,7 +909,7 @@ export const buildNodeHandlerRegistry = (deps: NodeHandlerDeps): Map<string, Nod
     const valueL = r(node, 'valuel', 0, context, scopeGraph);
     const valueR = r(node, 'valuer', 0, context, scopeGraph);
     const center = r(node, 'center', 0.5, context, scopeGraph);
-    const texcoord = r(node, 'texcoord', uv(0), context, scopeGraph);
+    const texcoord = r(node, 'texcoord', mxToUvSpace(uv(0)), context, scopeGraph);
     return mx_splitlr(valueL as never, valueR as never, center as never, texcoord as never);
   });
 
@@ -929,7 +917,7 @@ export const buildNodeHandlerRegistry = (deps: NodeHandlerDeps): Map<string, Nod
     const valueT = r(node, 'valuet', 0, context, scopeGraph);
     const valueB = r(node, 'valueb', 0, context, scopeGraph);
     const center = r(node, 'center', 0.5, context, scopeGraph);
-    const texcoord = r(node, 'texcoord', uv(0), context, scopeGraph);
+    const texcoord = r(node, 'texcoord', mxToUvSpace(uv(0)), context, scopeGraph);
     return mx_splittb(valueT as never, valueB as never, center as never, texcoord as never);
   });
 
@@ -1233,7 +1221,7 @@ export const buildNodeHandlerRegistry = (deps: NodeHandlerDeps): Map<string, Nod
     const valuetr = r(node, 'valuetr', 0, context, scopeGraph);
     const valuebl = r(node, 'valuebl', 0, context, scopeGraph);
     const valuebr = r(node, 'valuebr', 0, context, scopeGraph);
-    const texcoord = r(node, 'texcoord', uv(0), context, scopeGraph);
+    const texcoord = r(node, 'texcoord', mxToUvSpace(uv(0)), context, scopeGraph);
     const clamped = clamp(texcoord as never, vec2(0, 0) as never, vec2(1, 1) as never);
     const s = getNodeChannel(clamped, 0);
     const t = getNodeChannel(clamped, 1);
@@ -1287,7 +1275,7 @@ export const buildNodeHandlerRegistry = (deps: NodeHandlerDeps): Map<string, Nod
   });
 
   map.set('ramp', (node, context, scopeGraph) => {
-    const texcoord = r(node, 'texcoord', uv(0), context, scopeGraph);
+    const texcoord = r(node, 'texcoord', mxToUvSpace(uv(0)), context, scopeGraph);
     const rampType = r(node, 'type', 0, context, scopeGraph);
     const interpolation = r(node, 'interpolation', 1, context, scopeGraph);
     const numIntervals = r(node, 'num_intervals', 2, context, scopeGraph);
