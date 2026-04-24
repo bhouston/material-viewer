@@ -867,15 +867,15 @@ export const buildNodeHandlerRegistry = (deps: NodeHandlerDeps): Map<string, Nod
 
     return vec3(
       add(
-        add(mul(m00 as never, x as never) as never, mul(m01 as never, y as never) as never) as never,
-        mul(m02 as never, z as never) as never,
+        add(mul(m00 as never, x as never) as never, mul(m10 as never, y as never) as never) as never,
+        mul(m20 as never, z as never) as never,
       ),
       add(
-        add(mul(m10 as never, x as never) as never, mul(m11 as never, y as never) as never) as never,
-        mul(m12 as never, z as never) as never,
+        add(mul(m01 as never, x as never) as never, mul(m11 as never, y as never) as never) as never,
+        mul(m21 as never, z as never) as never,
       ),
       add(
-        add(mul(m20 as never, x as never) as never, mul(m21 as never, y as never) as never) as never,
+        add(mul(m02 as never, x as never) as never, mul(m12 as never, y as never) as never) as never,
         mul(m22 as never, z as never) as never,
       ),
     );
