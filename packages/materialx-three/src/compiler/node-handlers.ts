@@ -356,7 +356,10 @@ export const buildNodeHandlerRegistry = (deps: NodeHandlerDeps): Map<string, Nod
     return mxToUvSpace(uv(index));
   });
 
-  map.set('position', (node) => (node.attributes.space === 'world' ? positionWorld : positionLocal));
+  map.set('position', (node) => {
+    const space = readSpaceInput(node, 'space', 'object');
+    return space === 'world' ? positionWorld : positionLocal;
+  });
   map.set('normal', (node) => {
     const space = readSpaceInput(node, 'space', 'object');
     return space === 'world' ? normalWorld : normalLocal;
@@ -722,7 +725,13 @@ export const buildNodeHandlerRegistry = (deps: NodeHandlerDeps): Map<string, Nod
       const in3 = toVectorComponents(r(node, 'in3', vec3(0, 0, 1), context, scopeGraph), 3, [0, 0, 1]);
       return {
         kind: 'matrix33',
-        values: [in1, in2, in3],
+        // MaterialX creates matrices from vector inputs as columns.
+        // Store row-wise values here to keep matrix algebra consistent with matrix-ops helpers.
+        values: [
+          [in1[0], in2[0], in3[0]],
+          [in1[1], in2[1], in3[1]],
+          [in1[2], in2[2], in3[2]],
+        ],
       } satisfies MatrixValue;
     }
     if (nodeDefName === 'ND_creatematrix_vector3_matrix44') {
@@ -733,10 +742,10 @@ export const buildNodeHandlerRegistry = (deps: NodeHandlerDeps): Map<string, Nod
       return {
         kind: 'matrix44',
         values: [
-          [in1[0], in1[1], in1[2], 0],
-          [in2[0], in2[1], in2[2], 0],
-          [in3[0], in3[1], in3[2], 0],
-          [in4[0], in4[1], in4[2], 1],
+          [in1[0], in2[0], in3[0], in4[0]],
+          [in1[1], in2[1], in3[1], in4[1]],
+          [in1[2], in2[2], in3[2], in4[2]],
+          [0, 0, 0, 1],
         ],
       } satisfies MatrixValue;
     }
@@ -746,7 +755,12 @@ export const buildNodeHandlerRegistry = (deps: NodeHandlerDeps): Map<string, Nod
     const in4 = toVectorComponents(r(node, 'in4', vec4(0, 0, 0, 1), context, scopeGraph), 4, [0, 0, 0, 1]);
     return {
       kind: 'matrix44',
-      values: [in1, in2, in3, in4],
+      values: [
+        [in1[0], in2[0], in3[0], in4[0]],
+        [in1[1], in2[1], in3[1], in4[1]],
+        [in1[2], in2[2], in3[2], in4[2]],
+        [in1[3], in2[3], in3[3], in4[3]],
+      ],
     } satisfies MatrixValue;
   });
 

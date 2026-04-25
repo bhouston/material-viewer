@@ -43,7 +43,11 @@ export const matrixFromEntries = (kind: 'matrix33' | 'matrix44', entries: number
   const size = kind === 'matrix33' ? 3 : 4;
   const values: unknown[][] = [];
   for (let row = 0; row < size; row += 1) {
-    values.push(entries.slice(row * size, (row + 1) * size));
+    const rowValues: number[] = [];
+    for (let column = 0; column < size; column += 1) {
+      rowValues.push(entries[column * size + row] ?? 0);
+    }
+    values.push(rowValues);
   }
   return { kind, values };
 };
