@@ -64,6 +64,8 @@ import {
   step,
   sub,
   tan,
+  tangentLocal,
+  tangentWorld,
   uv,
   vec2,
   vec3,
@@ -131,15 +133,18 @@ const mx_smoothstep_materialx = (inNode: unknown, low: unknown, high: unknown): 
   return mix(hermite as never, fallback as never, useFallback as never);
 };
 
-const normalizeSpaceName = (value: unknown): 'object' | 'world' => {
+const normalizeSpaceName = (value: unknown, fallback: 'object' | 'world' = 'world'): 'object' | 'world' => {
   if (typeof value !== 'string') {
-    return 'world';
+    return fallback;
   }
   const normalized = value.trim().toLowerCase();
   if (normalized === 'object' || normalized === 'model') {
     return 'object';
   }
-  return 'world';
+  if (normalized === 'world') {
+    return 'world';
+  }
+  return fallback;
 };
 
 const readSpaceInput = (node: MaterialXNode, inputName: string, fallback: 'object' | 'world'): 'object' | 'world' => {
@@ -148,7 +153,7 @@ const readSpaceInput = (node: MaterialXNode, inputName: string, fallback: 'objec
   if (rawValue === undefined || rawValue === null) {
     return fallback;
   }
-  return normalizeSpaceName(rawValue);
+  return normalizeSpaceName(rawValue, fallback);
 };
 
 const transformPointBetweenSpaces = (
@@ -356,7 +361,10 @@ export const buildNodeHandlerRegistry = (deps: NodeHandlerDeps): Map<string, Nod
     const space = readSpaceInput(node, 'space', 'object');
     return space === 'world' ? normalWorld : normalLocal;
   });
-  map.set('tangent', () => vec3(1, 0, 0));
+  map.set('tangent', (node) => {
+    const space = readSpaceInput(node, 'space', 'object');
+    return space === 'world' ? tangentWorld : tangentLocal;
+  });
   map.set('viewdirection', () => normalize(mul(positionWorld as never, float(-1)) as never));
 
   map.set('normalmap', (node, context, scopeGraph) => {

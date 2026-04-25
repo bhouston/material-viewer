@@ -18,6 +18,8 @@ import {
   sub,
   texture,
   uv,
+  dFdx,
+  dFdy,
   vec2,
   vec3,
   vec4,
@@ -168,7 +170,7 @@ const mxHextileCoord = (
   scaleRange: unknown,
   offset: unknown,
   offsetRange: unknown,
-): { coords: [unknown, unknown, unknown]; weights: unknown } => {
+): { coords: [unknown, unknown, unknown]; ddx: [unknown, unknown, unknown]; ddy: [unknown, unknown, unknown]; weights: unknown } => {
   const st = mul(coord as never, HEXTILE_SQRT3_2 as never);
   const stSkewed = vec2(
     add(element(st as never, 0 as never) as never, mul(-0.57735027 as never, element(st as never, 1 as never) as never) as never) as never,
@@ -243,11 +245,30 @@ const mxHextileCoord = (
     return add(add(div(rotated as never, vec2(safeScale as never, safeScale as never) as never) as never, center as never) as never, randomOffset as never);
   };
 
+  const sampleDerivative = (derivative: unknown, rotationValue: unknown, sampleScale: unknown): unknown => {
+    const rotated = mxRotate2d(derivative, sin(rotationValue as never), cos(rotationValue as never));
+    const safeScale = max(sampleScale as never, HEXTILE_EPSILON as never);
+    return div(rotated as never, vec2(safeScale as never, safeScale as never) as never);
+  };
+
+  const ddx = dFdx(coord as never);
+  const ddy = dFdy(coord as never);
+
   return {
     coords: [
       sampleCoord(ctr1, offset1, element(rotations as never, 0 as never), element(scales as never, 0 as never)),
       sampleCoord(ctr2, offset2, element(rotations as never, 1 as never), element(scales as never, 1 as never)),
       sampleCoord(ctr3, offset3, element(rotations as never, 2 as never), element(scales as never, 2 as never)),
+    ],
+    ddx: [
+      sampleDerivative(ddx, element(rotations as never, 0 as never), element(scales as never, 0 as never)),
+      sampleDerivative(ddx, element(rotations as never, 1 as never), element(scales as never, 1 as never)),
+      sampleDerivative(ddx, element(rotations as never, 2 as never), element(scales as never, 2 as never)),
+    ],
+    ddy: [
+      sampleDerivative(ddy, element(rotations as never, 0 as never), element(scales as never, 0 as never)),
+      sampleDerivative(ddy, element(rotations as never, 1 as never), element(scales as never, 1 as never)),
+      sampleDerivative(ddy, element(rotations as never, 2 as never), element(scales as never, 2 as never)),
     ],
     weights: vec3(w1 as never, w2 as never, w3 as never),
   };
@@ -396,10 +417,13 @@ export const createTextureNodeCompiler = ({ resolveInputNode, readInput, warn, t
     const textureResolver =
       context.options.textureResolver ?? createTextureResolver({ basePath: context.options.basePath });
     const tex = textureResolver.resolve(uri, { document: context.document, node });
-    const tileData = mxHextileCoord(transformedUv, rotation, rotationRange, scale, scaleRange, offset, offsetRange);
-    const sample0Raw = texture(tex, mxFromUvSpace(tileData.coords[0]) as never);
-    const sample1Raw = texture(tex, mxFromUvSpace(tileData.coords[1]) as never);
-    const sample2Raw = texture(tex, mxFromUvSpace(tileData.coords[2]) as never);
+    const tileData = mxHextileCoord(transformedUv, rotation, rotationRange, scale, scaleRange, offset, offsetRange) as { coords: [unknown, unknown, unknown]; ddx: [unknown, unknown, unknown]; ddy: [unknown, unknown, unknown]; weights: unknown };
+    
+    const invertY = (v: unknown): unknown => vec2(element(v as never, 0 as never) as never, mul(element(v as never, 1 as never) as never, -1) as never);
+    
+    const sample0Raw = texture(tex, mxFromUvSpace(tileData.coords[0]) as never).grad(invertY(tileData.ddx[0]) as never, invertY(tileData.ddy[0]) as never);
+    const sample1Raw = texture(tex, mxFromUvSpace(tileData.coords[1]) as never).grad(invertY(tileData.ddx[1]) as never, invertY(tileData.ddy[1]) as never);
+    const sample2Raw = texture(tex, mxFromUvSpace(tileData.coords[2]) as never).grad(invertY(tileData.ddx[2]) as never, invertY(tileData.ddy[2]) as never);
     const sample0 = applyTextureColorSpace(
       fileInput?.attributes.colorspace,
       context.document.attributes.colorspace,
