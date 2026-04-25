@@ -55,12 +55,20 @@ export const createResolveInputNode =
 
     const reference = resolveInputReference(input, scopeGraph, context.index);
     if (reference?.fromNode) {
-      const requestedOutput =
-        reference.fromOutput?.attributes.output ??
-        input.output ??
-        input.attributes.output ??
-        reference.fromOutput?.name;
-      return compileNode(reference.fromNode, context, reference.fromGraph ?? scopeGraph, requestedOutput);
+      const requestedOutput = reference.fromOutput
+        ? reference.fromOutput.attributes.output
+        : (input.output ?? input.attributes.output);
+      const compiledReference = compileNode(reference.fromNode, context, reference.fromGraph ?? scopeGraph, requestedOutput);
+      if (compiledReference !== undefined) {
+        return compiledReference;
+      }
+      warn(context, {
+        code: 'invalid-value',
+        message: `No output found for port connection "${inputName}" on node "${node.name ?? node.category}"`,
+        category: node.category,
+        nodeName: node.name,
+      });
+      return toNodeValue(fallback, input.type);
     }
 
     if (input.attributes.value !== undefined) {

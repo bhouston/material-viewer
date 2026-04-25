@@ -88,6 +88,7 @@ import {
   transposeMatrix,
 } from './matrix-ops.js';
 import { asMatrixValue, matrixIdentity } from './value-coercion.js';
+import { warn } from './warnings.js';
 
 export type ResolveInputNodeFn = (
   node: MaterialXNode,
@@ -161,16 +162,18 @@ const transformPointBetweenSpaces = (
   fromSpace: 'object' | 'world',
   toSpace: 'object' | 'world',
 ): unknown => {
-  if (fromSpace === toSpace) {
-    return inNode;
-  }
   const inPoint = vec3(inNode as never);
+  if (fromSpace === toSpace) {
+    return inPoint;
+  }
   const makeVec4 = vec4 as unknown as (x: unknown, y: unknown) => unknown;
   const point4 = makeVec4(inPoint, float(1));
+  const multiplyPoint = (matrixNode: unknown): unknown =>
+    (mul(point4 as never, matrixNode as never) as { xyz?: unknown }).xyz;
   if (fromSpace === 'object' && toSpace === 'world') {
-    return (modelWorldMatrix as { mul: (rhs: unknown) => { xyz?: unknown } }).mul(point4 as never).xyz;
+    return multiplyPoint(modelWorldMatrix);
   }
-  return (modelWorldMatrixInverse as { mul: (rhs: unknown) => { xyz?: unknown } }).mul(point4 as never).xyz;
+  return multiplyPoint(modelWorldMatrixInverse);
 };
 
 const transformVectorBetweenSpaces = (
@@ -178,16 +181,16 @@ const transformVectorBetweenSpaces = (
   fromSpace: 'object' | 'world',
   toSpace: 'object' | 'world',
 ): unknown => {
-  if (fromSpace === toSpace) {
-    return inNode;
-  }
   const inVector = vec3(inNode as never);
-  const makeVec4 = vec4 as unknown as (x: unknown, y: unknown) => unknown;
-  const vector4 = makeVec4(inVector, float(0));
-  if (fromSpace === 'object' && toSpace === 'world') {
-    return (modelWorldMatrix as { mul: (rhs: unknown) => { xyz?: unknown } }).mul(vector4 as never).xyz;
+  if (fromSpace === toSpace) {
+    return inVector;
   }
-  return (modelWorldMatrixInverse as { mul: (rhs: unknown) => { xyz?: unknown } }).mul(vector4 as never).xyz;
+
+  if (fromSpace === 'object' && toSpace === 'world') {
+    return mul(inVector as never, mat3(modelWorldMatrix as never) as never);
+  }
+
+  return mul(inVector as never, mat3(modelWorldMatrixInverse as never) as never);
 };
 
 const transformNormalBetweenSpaces = (
@@ -202,9 +205,9 @@ const transformNormalBetweenSpaces = (
   }
   const inNormal = makeVec3(inNode);
   if (fromSpace === 'object' && toSpace === 'world') {
-    return normalizeUnsafe(mul(modelNormalMatrix as never, inNormal as never));
+    return normalizeUnsafe(mul(inNormal as never, modelNormalMatrix as never));
   }
-  return normalizeUnsafe(mul(mat3(modelWorldMatrix as never) as never, inNormal as never));
+  return normalizeUnsafe(mul(inNormal as never, mat3(modelWorldMatrix as never) as never));
 };
 
 const safePowerScalar = (base: unknown, exponent: unknown): unknown =>
@@ -362,7 +365,7 @@ export const buildNodeHandlerRegistry = (deps: NodeHandlerDeps): Map<string, Nod
   });
   map.set('normal', (node) => {
     const space = readSpaceInput(node, 'space', 'object');
-    return space === 'world' ? normalWorld : normalLocal;
+    return normalize((space === 'world' ? normalWorld : normalLocal) as never);
   });
   map.set('tangent', (node) => {
     const space = readSpaceInput(node, 'space', 'object');
@@ -799,6 +802,15 @@ export const buildNodeHandlerRegistry = (deps: NodeHandlerDeps): Map<string, Nod
   register(map, ['separate2', 'separate3', 'separate4'], (node, context, scopeGraph, outputName) => {
     const inNode = r(node, 'in', vec4(0, 0, 0, 1), context, scopeGraph);
     const channelIndex = outputNameToChannelIndex(outputName);
+    if (channelIndex === undefined) {
+      warn(context, {
+        code: 'invalid-value',
+        message: `No output found for port connection on "${node.name ?? node.category}" for output "${outputName ?? ''}"`,
+        category: node.category,
+        nodeName: node.name,
+      });
+      return undefined;
+    }
     return getNodeChannel(inNode, channelIndex);
   });
 
@@ -1002,9 +1014,14 @@ export const buildNodeHandlerRegistry = (deps: NodeHandlerDeps): Map<string, Nod
     );
   });
 
-  register(map, ['cellnoise2d', 'cellnoise3d'], (node, context, scopeGraph) => {
+  map.set('cellnoise2d', (node, context, scopeGraph) => {
     const texcoord = r(node, 'texcoord', vec2(0, 0), context, scopeGraph);
     return mx_cell_noise_float(texcoord as never);
+  });
+
+  map.set('cellnoise3d', (node, context, scopeGraph) => {
+    const position = r(node, 'position', positionLocal, context, scopeGraph);
+    return mx_cell_noise_float(position as never);
   });
 
   register(map, ['worleynoise2d', 'worleynoise3d'], (node, context, scopeGraph) => {
