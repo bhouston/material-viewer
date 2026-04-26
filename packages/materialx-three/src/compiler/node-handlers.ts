@@ -14,6 +14,7 @@ import {
   dot,
   exp,
   float,
+  int,
   floor,
   fract,
   length,
@@ -36,18 +37,19 @@ import {
   mx_ifgreatereq,
   mx_atan2,
   mx_noise_float,
+  mx_worley_noise_float,
   mx_ramplr,
   mx_ramptb,
   mx_rgbtohsv,
   mx_splitlr,
   mx_splittb,
   mx_timer,
-  mx_unifiednoise2d,
-  mx_unifiednoise3d,
-  mx_worley_noise_float,
   modelNormalMatrix,
   modelWorldMatrix,
   modelWorldMatrixInverse,
+  Fn,
+  If,
+  Loop,
   normalMap,
   normalLocal,
   positionLocal,
@@ -225,6 +227,39 @@ const rotate2dMaterialX = (inNode: unknown, amount: unknown): unknown => {
   );
 };
 
+const rotate3dMaterialX = (inNode: unknown, amount: unknown, axis: unknown = vec3(0, 1, 0)): unknown => {
+  const normalizedAxis = normalize(axis as never);
+  const rotationRadians = mul(amount as never, float(Math.PI / 180.0) as never);
+  const s = sin(rotationRadians as never);
+  const c = cos(rotationRadians as never);
+  const oc = sub(float(1), c as never);
+
+  const x = getNodeChannel(inNode, 0);
+  const y = getNodeChannel(inNode, 1);
+  const z = getNodeChannel(inNode, 2);
+  const ax = getNodeChannel(normalizedAxis, 0);
+  const ay = getNodeChannel(normalizedAxis, 1);
+  const az = getNodeChannel(normalizedAxis, 2);
+
+  const m00 = add(mul(mul(oc as never, ax as never) as never, ax as never) as never, c as never);
+  const m01 = sub(mul(mul(oc as never, ax as never) as never, ay as never) as never, mul(az as never, s as never) as never);
+  const m02 = add(mul(mul(oc as never, az as never) as never, ax as never) as never, mul(ay as never, s as never) as never);
+
+  const m10 = add(mul(mul(oc as never, ax as never) as never, ay as never) as never, mul(az as never, s as never) as never);
+  const m11 = add(mul(mul(oc as never, ay as never) as never, ay as never) as never, c as never);
+  const m12 = sub(mul(mul(oc as never, ay as never) as never, az as never) as never, mul(ax as never, s as never) as never);
+
+  const m20 = sub(mul(mul(oc as never, az as never) as never, ax as never) as never, mul(ay as never, s as never) as never);
+  const m21 = add(mul(mul(oc as never, ay as never) as never, az as never) as never, mul(ax as never, s as never) as never);
+  const m22 = add(mul(mul(oc as never, az as never) as never, az as never) as never, c as never);
+
+  return vec3(
+    add(add(mul(m00 as never, x as never) as never, mul(m10 as never, y as never) as never) as never, mul(m20 as never, z as never) as never),
+    add(add(mul(m01 as never, x as never) as never, mul(m11 as never, y as never) as never) as never, mul(m21 as never, z as never) as never),
+    add(add(mul(m02 as never, x as never) as never, mul(m12 as never, y as never) as never) as never, mul(m22 as never, z as never) as never),
+  );
+};
+
 const place2dMaterialX = (
   texcoord: unknown,
   pivot: unknown,
@@ -285,6 +320,160 @@ const safePowerNode = (in1: unknown, in2: unknown, outputType?: string): unknown
     );
   }
   return safePowerScalar(in1, in2);
+};
+
+const mx_worley_noise_float_materialx_2d = (texcoord: unknown, jitter: unknown, style: unknown): unknown => {
+  const distanceMode = mx_worley_noise_float(texcoord as never, jitter as never);
+  const solidMode = mx_cell_noise_float(texcoord as never);
+  return mx_ifequal_materialx(float(style as never), float(1), solidMode, distanceMode);
+};
+
+const mxWorleyNoiseFloatMaterialX3d = ((Fn as any)(([positionInput, jitterInput, styleInput]: [unknown, unknown, unknown]) => {
+  const position = vec3(positionInput as never).toVar();
+  const jitter = float(jitterInput as never).toVar();
+  const style = int(styleInput as never).toVar();
+  const baseCell = vec3(floor(getNodeChannel(position, 0) as never), floor(getNodeChannel(position, 1) as never), floor(getNodeChannel(position, 2) as never)).toVar();
+  const localpos = fract(position as never).toVar();
+  const sqdist = float(1e6).toVar();
+  const minpos = vec3(0, 0, 0).toVar();
+
+  // Type inference blows up on deeply nested TSL loop nodes; runtime behavior is correct.
+  // @ts-expect-error - TSL node unions become too complex for TS to represent here.
+  Loop({ start: -1, end: int(1), condition: '<=' }, ({ i: x }) => {
+    Loop({ start: -1, end: int(1), condition: '<=' }, ({ i: y }) => {
+      Loop({ start: -1, end: int(1), condition: '<=' }, ({ i: z }) => {
+        const cellCoords = vec3(
+          add(getNodeChannel(baseCell, 0) as never, float(x as never) as never),
+          add(getNodeChannel(baseCell, 1) as never, float(y as never) as never),
+          add(getNodeChannel(baseCell, 2) as never, float(z as never) as never),
+        ).toVar();
+        const off = vec3(
+          mx_cell_noise_float(vec4(cellCoords as never, float(0) as never) as never),
+          mx_cell_noise_float(vec4(cellCoords as never, float(1) as never) as never),
+          mx_cell_noise_float(vec4(cellCoords as never, float(2) as never) as never),
+        ).toVar();
+        off.subAssign(float(0.5));
+        off.mulAssign(jitter);
+        off.addAssign(float(0.5));
+        const cellpos = vec3(
+          sub(
+            add(vec3(float(x as never) as never, float(y as never) as never, float(z as never) as never) as never, off as never) as never,
+            localpos as never,
+          ) as never,
+        ).toVar();
+        const dist = dot(cellpos as never, cellpos as never).toVar();
+
+        If((dist.lessThan(sqdist as never) as never), () => {
+          sqdist.assign(dist as never);
+          minpos.assign(cellpos as never);
+        });
+      });
+    });
+  });
+
+  If(style.equal(int(1)), () => {
+    sqdist.assign(mx_cell_noise_float(add(minpos as never, position as never) as never) as never);
+  }).Else(() => {
+    sqdist.assign(sqrt(sqdist as never) as never);
+  });
+
+  return sqdist;
+}) as unknown) as (position: unknown, jitter: unknown, style: unknown) => unknown;
+
+const mxUnifiedNoise2dMaterialX = (
+  type: unknown,
+  texcoord: unknown,
+  freq: unknown,
+  offset: unknown,
+  jitter: unknown,
+  outMin: unknown,
+  outMax: unknown,
+  clampOutput: unknown,
+  octaves: unknown,
+  lacunarity: unknown,
+  diminish: unknown,
+  style: unknown,
+): unknown => {
+  const applyFreq = mul(texcoord as never, freq as never);
+  const applyOffset = add(applyFreq as never, offset as never);
+  const cellJitterMult = mul(sub(jitter as never, float(1)) as never, float(90000));
+  const applyCellJitter = vec3(
+    getNodeChannel(applyOffset, 0) as never,
+    getNodeChannel(applyOffset, 1) as never,
+    cellJitterMult as never,
+  );
+  const perlin = mx_noise_float(applyCellJitter as never, float(0.5), float(0.5));
+  const cell = mx_cell_noise_float(applyCellJitter as never);
+  const worley = mx_worley_noise_float_materialx_2d(applyOffset, jitter, style);
+  const fractal = mx_fractal_noise_float(
+    applyCellJitter as never,
+    octaves as never,
+    lacunarity as never,
+    diminish as never,
+    float(1),
+  );
+
+  const typeFloat = float(type as never);
+  const switched = mx_ifequal_materialx(
+    typeFloat,
+    float(3),
+    fractal,
+    mx_ifequal_materialx(
+      typeFloat,
+      float(2),
+      worley,
+      mx_ifequal_materialx(typeFloat, float(1), cell, perlin),
+    ),
+  );
+  const ranged = add(outMin as never, mul(switched as never, sub(outMax as never, outMin as never) as never) as never);
+  const clamped = clamp(ranged as never, outMin as never, outMax as never);
+  return mx_ifequal_materialx(clampOutput, float(1), clamped, ranged);
+};
+
+const mxUnifiedNoise3dMaterialX = (
+  type: unknown,
+  position: unknown,
+  freq: unknown,
+  offset: unknown,
+  jitter: unknown,
+  outMin: unknown,
+  outMax: unknown,
+  clampOutput: unknown,
+  octaves: unknown,
+  lacunarity: unknown,
+  diminish: unknown,
+  style: unknown,
+): unknown => {
+  const applyFreq = mul(position as never, freq as never);
+  const applyOffset = add(applyFreq as never, offset as never);
+  const cellJitterMult = mul(sub(jitter as never, float(1)) as never, float(90000));
+  const applyCellJitter = rotate3dMaterialX(applyOffset, cellJitterMult, vec3(0.1, 1, 0));
+  const perlin = mx_noise_float(applyCellJitter as never, float(0.5), float(0.5));
+  const cell = mx_cell_noise_float(applyCellJitter as never);
+  const worley = mxWorleyNoiseFloatMaterialX3d(applyOffset, jitter, style);
+  const fractal = mx_fractal_noise_float(
+    applyCellJitter as never,
+    octaves as never,
+    lacunarity as never,
+    diminish as never,
+    float(1),
+  );
+
+  const typeFloat = float(type as never);
+  const switched = mx_ifequal_materialx(
+    typeFloat,
+    float(3),
+    fractal,
+    mx_ifequal_materialx(
+      typeFloat,
+      float(2),
+      worley,
+      mx_ifequal_materialx(typeFloat, float(1), cell, perlin),
+    ),
+  );
+  const ranged = add(outMin as never, mul(switched as never, sub(outMax as never, outMin as never) as never) as never);
+  const clamped = clamp(ranged as never, outMin as never, outMax as never);
+  return mx_ifequal_materialx(clampOutput, float(1), clamped, ranged);
 };
 
 const bin =
@@ -993,10 +1182,12 @@ export const buildNodeHandlerRegistry = (deps: NodeHandlerDeps): Map<string, Nod
   });
 
   register(map, ['noise2d', 'noise3d'], (node, context, scopeGraph) => {
-    const texcoord = r(node, 'texcoord', vec2(0, 0), context, scopeGraph);
+    const coordinate = node.category === 'noise2d'
+      ? r(node, 'texcoord', mxToUvSpace(uv(0)), context, scopeGraph)
+      : r(node, 'position', positionLocal, context, scopeGraph);
     const amplitude = r(node, 'amplitude', 1, context, scopeGraph);
     const pivot = r(node, 'pivot', 0, context, scopeGraph);
-    return mx_noise_float(texcoord as never, amplitude as never, pivot as never);
+    return mx_noise_float(coordinate as never, amplitude as never, pivot as never);
   });
 
   map.set('fractal3d', (node, context, scopeGraph) => {
@@ -1015,7 +1206,7 @@ export const buildNodeHandlerRegistry = (deps: NodeHandlerDeps): Map<string, Nod
   });
 
   map.set('cellnoise2d', (node, context, scopeGraph) => {
-    const texcoord = r(node, 'texcoord', vec2(0, 0), context, scopeGraph);
+    const texcoord = r(node, 'texcoord', mxToUvSpace(uv(0)), context, scopeGraph);
     return mx_cell_noise_float(texcoord as never);
   });
 
@@ -1024,64 +1215,63 @@ export const buildNodeHandlerRegistry = (deps: NodeHandlerDeps): Map<string, Nod
     return mx_cell_noise_float(position as never);
   });
 
-  register(map, ['worleynoise2d', 'worleynoise3d'], (node, context, scopeGraph) => {
-    const texcoord = r(node, 'texcoord', vec2(0, 0), context, scopeGraph);
+  map.set('worleynoise2d', (node, context, scopeGraph) => {
+    const texcoord = r(node, 'texcoord', mxToUvSpace(uv(0)), context, scopeGraph);
     const jitter = r(node, 'jitter', 1, context, scopeGraph);
-    return mx_worley_noise_float(texcoord as never, jitter as never);
+    const style = r(node, 'style', 0, context, scopeGraph);
+    return mx_worley_noise_float_materialx_2d(texcoord, jitter, style);
+  });
+
+  map.set('worleynoise3d', (node, context, scopeGraph) => {
+    const position = r(node, 'position', positionLocal, context, scopeGraph);
+    const jitter = r(node, 'jitter', 1, context, scopeGraph);
+    const style = r(node, 'style', 0, context, scopeGraph);
+    return mxWorleyNoiseFloatMaterialX3d(position, jitter, style);
   });
 
   map.set('unifiednoise2d', (node, context, scopeGraph) => {
     const type = r(node, 'type', 0, context, scopeGraph);
-    const texcoord = r(node, 'texcoord', vec2(0, 0), context, scopeGraph);
+    const texcoord = r(node, 'texcoord', mxToUvSpace(uv(0)), context, scopeGraph);
     const freq = r(node, 'freq', vec2(1, 1), context, scopeGraph);
     const offset = r(node, 'offset', vec2(0, 0), context, scopeGraph);
     const jitter = r(node, 'jitter', 1, context, scopeGraph);
     const outMin = r(node, 'outmin', 0, context, scopeGraph);
     const outMax = r(node, 'outmax', 1, context, scopeGraph);
-    const clampOutput = r(node, 'clampoutput', 0, context, scopeGraph);
+    const clampOutput = r(node, 'clampoutput', true, context, scopeGraph);
     const octaves = r(node, 'octaves', 3, context, scopeGraph);
     const lacunarity = r(node, 'lacunarity', 2, context, scopeGraph);
     const diminish = r(node, 'diminish', 0.5, context, scopeGraph);
-    return mx_unifiednoise2d(
-      type as never,
-      texcoord as never,
-      freq as never,
-      offset as never,
-      jitter as never,
-      outMin as never,
-      outMax as never,
-      clampOutput as never,
-      octaves as never,
-      lacunarity as never,
-      diminish as never,
+    const style = r(node, 'style', 0, context, scopeGraph);
+    return mxUnifiedNoise2dMaterialX(
+      type,
+      texcoord,
+      freq,
+      offset,
+      jitter,
+      outMin,
+      outMax,
+      clampOutput,
+      octaves,
+      lacunarity,
+      diminish,
+      style,
     );
   });
 
   map.set('unifiednoise3d', (node, context, scopeGraph) => {
     const type = r(node, 'type', 0, context, scopeGraph);
-    const texcoord = r(node, 'texcoord', vec3(0, 0, 0), context, scopeGraph);
+    const position = r(node, 'position', positionLocal, context, scopeGraph);
     const freq = r(node, 'freq', vec3(1, 1, 1), context, scopeGraph);
     const offset = r(node, 'offset', vec3(0, 0, 0), context, scopeGraph);
     const jitter = r(node, 'jitter', 1, context, scopeGraph);
     const outMin = r(node, 'outmin', 0, context, scopeGraph);
     const outMax = r(node, 'outmax', 1, context, scopeGraph);
-    const clampOutput = r(node, 'clampoutput', 0, context, scopeGraph);
+    const clampOutput = r(node, 'clampoutput', true, context, scopeGraph);
     const octaves = r(node, 'octaves', 3, context, scopeGraph);
     const lacunarity = r(node, 'lacunarity', 2, context, scopeGraph);
     const diminish = r(node, 'diminish', 0.5, context, scopeGraph);
-    return mx_unifiednoise3d(
-      type as never,
-      texcoord as never,
-      freq as never,
-      offset as never,
-      jitter as never,
-      outMin as never,
-      outMax as never,
-      clampOutput as never,
-      octaves as never,
-      lacunarity as never,
-      diminish as never,
-    );
+    const style = r(node, 'style', 0, context, scopeGraph);
+    return mxUnifiedNoise3dMaterialX(type, position, freq, offset, jitter, outMin, outMax, clampOutput, octaves, lacunarity, diminish, style);
   });
 
   map.set('hextiledimage', (node, context, scopeGraph) => compileHexTiledTextureNode(node, context, scopeGraph));
