@@ -4,6 +4,8 @@ import {
   add,
   acos,
   asin,
+  bitOr,
+  bitXor,
   ceil,
   checker,
   clamp,
@@ -37,7 +39,6 @@ import {
   mx_ifgreatereq,
   mx_atan2,
   mx_noise_float,
-  mx_worley_noise_float,
   mx_ramplr,
   mx_ramptb,
   mx_rgbtohsv,
@@ -68,6 +69,9 @@ import {
   tan,
   tangentLocal,
   tangentWorld,
+  shiftLeft,
+  shiftRight,
+  uint,
   uv,
   vec2,
   vec3,
@@ -126,6 +130,90 @@ const mx_ifgreatereq_materialx = (value1: unknown, value2: unknown, in1: unknown
   mx_ifgreatereq(value1 as never, value2 as never, in2 as never, in1 as never);
 const mx_ifequal_materialx = (value1: unknown, value2: unknown, in1: unknown, in2: unknown): unknown =>
   mx_ifequal(value1 as never, value2 as never, in2 as never, in1 as never);
+
+const mxRotl32MaterialX = (x: unknown, k: number): unknown =>
+  bitOr(
+    shiftLeft(x as never, uint(k) as never) as never,
+    shiftRight(x as never, uint(32 - k) as never) as never,
+  );
+
+const mxBjmixMaterialX = (aInput: unknown, bInput: unknown, cInput: unknown): [unknown, unknown, unknown] => {
+  const a = uint(aInput as never).toVar();
+  const b = uint(bInput as never).toVar();
+  const c = uint(cInput as never).toVar();
+
+  a.subAssign(c as never);
+  a.assign(bitXor(a as never, mxRotl32MaterialX(c, 4) as never) as never);
+  c.addAssign(b as never);
+  b.subAssign(a as never);
+  b.assign(bitXor(b as never, mxRotl32MaterialX(a, 6) as never) as never);
+  a.addAssign(c as never);
+  c.subAssign(b as never);
+  c.assign(bitXor(c as never, mxRotl32MaterialX(b, 8) as never) as never);
+  b.addAssign(a as never);
+  a.subAssign(c as never);
+  a.assign(bitXor(a as never, mxRotl32MaterialX(c, 16) as never) as never);
+  c.addAssign(b as never);
+  b.subAssign(a as never);
+  b.assign(bitXor(b as never, mxRotl32MaterialX(a, 19) as never) as never);
+  a.addAssign(c as never);
+  c.subAssign(b as never);
+  c.assign(bitXor(c as never, mxRotl32MaterialX(b, 4) as never) as never);
+  b.addAssign(a as never);
+
+  return [a, b, c];
+};
+
+const mxBjfinalMaterialX = (aInput: unknown, bInput: unknown, cInput: unknown): unknown => {
+  const a = uint(aInput as never).toVar();
+  const b = uint(bInput as never).toVar();
+  const c = uint(cInput as never).toVar();
+
+  c.assign(bitXor(c as never, b as never) as never);
+  c.subAssign(mxRotl32MaterialX(b, 14) as never);
+  a.assign(bitXor(a as never, c as never) as never);
+  a.subAssign(mxRotl32MaterialX(c, 11) as never);
+  b.assign(bitXor(b as never, a as never) as never);
+  b.subAssign(mxRotl32MaterialX(a, 25) as never);
+  c.assign(bitXor(c as never, b as never) as never);
+  c.subAssign(mxRotl32MaterialX(b, 16) as never);
+  a.assign(bitXor(a as never, c as never) as never);
+  a.subAssign(mxRotl32MaterialX(c, 4) as never);
+  b.assign(bitXor(b as never, a as never) as never);
+  b.subAssign(mxRotl32MaterialX(a, 14) as never);
+  c.assign(bitXor(c as never, b as never) as never);
+  c.subAssign(mxRotl32MaterialX(b, 24) as never);
+
+  return c;
+};
+
+const mxBitsTo01MaterialX = (bits: unknown): unknown =>
+  div(float(bits as never) as never, float(uint(0xffffffff) as never) as never);
+
+const mxCellNoiseVec3MaterialX = ((Fn as any)(([positionInput]: [unknown]) => {
+  const position = vec3(positionInput as never).toVar();
+  const ix = int(floor(getNodeChannel(position, 0) as never) as never).toVar();
+  const iy = int(floor(getNodeChannel(position, 1) as never) as never).toVar();
+  const iz = int(floor(getNodeChannel(position, 2) as never) as never).toVar();
+  const seed = uint(0xdeadbeef + (4 << 2) + 13).toVar();
+  const a = seed.toVar();
+  const b = seed.toVar();
+  const c = seed.toVar();
+  a.addAssign(uint(ix as never) as never);
+  b.addAssign(uint(iy as never) as never);
+  c.addAssign(uint(iz as never) as never);
+
+  const [mixedA, mixedB, mixedC] = mxBjmixMaterialX(a, b, c);
+  const hash0 = mxBjfinalMaterialX(mixedA, mixedB, mixedC);
+  const hash1 = mxBjfinalMaterialX(add(mixedA as never, uint(1) as never) as never, mixedB, mixedC);
+  const hash2 = mxBjfinalMaterialX(add(mixedA as never, uint(2) as never) as never, mixedB, mixedC);
+
+  return vec3(
+    mxBitsTo01MaterialX(hash0) as never,
+    mxBitsTo01MaterialX(hash1) as never,
+    mxBitsTo01MaterialX(hash2) as never,
+  );
+}) as unknown) as (position: unknown) => unknown;
 const mx_smoothstep_materialx = (inNode: unknown, low: unknown, high: unknown): unknown => {
   const range = sub(high as never, low as never);
   const safeRange = max(abs(range as never) as never, float(1e-6));
@@ -322,38 +410,82 @@ const safePowerNode = (in1: unknown, in2: unknown, outputType?: string): unknown
   return safePowerScalar(in1, in2);
 };
 
-const mx_worley_noise_float_materialx_2d = (texcoord: unknown, jitter: unknown, style: unknown): unknown => {
-  const distanceMode = mx_worley_noise_float(texcoord as never, jitter as never);
-  const solidMode = mx_cell_noise_float(texcoord as never);
-  return mx_ifequal_materialx(float(style as never), float(1), solidMode, distanceMode);
-};
+const mx_worley_noise_float_materialx_2d = ((Fn as any)(([texcoordInput, jitterInput, styleInput]: [unknown, unknown, unknown]) => {
+  const texcoord = vec2(texcoordInput as never).toVar();
+  const jitter = float(jitterInput as never).toVar();
+  const style = int(styleInput as never).toVar();
+  const texcoordNode = texcoord as any;
+
+  const X = int().toVar();
+  const Y = int().toVar();
+  const floorPos = floor(texcoord as never).toVar();
+  const floorPosNode = floorPos as any;
+  X.assign(int(floorPosNode.x as never));
+  Y.assign(int(floorPosNode.y as never));
+  const localpos = vec2(fract(texcoordNode.x as never), fract(texcoordNode.y as never)).toVar();
+  const sqdist = float(1e6).toVar();
+  const minpos = vec2(0, 0).toVar();
+
+  // Type inference blows up on deeply nested TSL loop nodes; runtime behavior is correct.
+  (Loop as any)({ start: -1, end: int(1), name: 'x', condition: '<=' }, ({ x }: { x: unknown }) => {
+    (Loop as any)({ start: -1, end: int(1), name: 'y', condition: '<=' }, ({ y }: { y: unknown }) => {
+      // @ts-expect-error - TSL union types in nested loops are too complex for TS.
+      const cell = vec2(float(x as never), float(y as never)).toVar();
+      const cellNode = cell as any;
+      const seed = vec2(
+        cellNode.x.add(float(X as never)),
+        cellNode.y.add(float(Y as never)),
+      ).toVar();
+      const seedNode = seed as any;
+      const off = vec2(
+        mx_cell_noise_float(vec3(seedNode.x as never, seedNode.y as never, 0) as never),
+        mx_cell_noise_float(vec3(seedNode.x as never, seedNode.y as never, 1) as never),
+      ).toVar();
+      off.subAssign(float(0.5));
+      off.mulAssign(jitter as never);
+      off.addAssign(float(0.5));
+      const cellpos = vec2(sub(add(cell as never, off as never) as never, localpos as never) as never).toVar();
+      const dist = dot(cellpos as never, cellpos as never).toVar();
+
+      If((dist.lessThan(sqdist as never) as never), () => {
+        sqdist.assign(dist as never);
+        minpos.assign(cellpos as never);
+      });
+    });
+  });
+
+  If((style as any).equal(int(1)), () => {
+    sqdist.assign(mx_cell_noise_float(add(minpos as never, texcoord as never) as never) as never);
+  }).Else(() => {
+    sqdist.assign(sqrt(sqdist as never) as never);
+  });
+
+  return sqdist;
+}) as unknown) as (texcoord: unknown, jitter: unknown, style: unknown) => unknown;
 
 const mxWorleyNoiseFloatMaterialX3d = ((Fn as any)(([positionInput, jitterInput, styleInput]: [unknown, unknown, unknown]) => {
   const position = vec3(positionInput as never).toVar();
   const jitter = float(jitterInput as never).toVar();
   const style = int(styleInput as never).toVar();
-  const baseCell = vec3(floor(getNodeChannel(position, 0) as never), floor(getNodeChannel(position, 1) as never), floor(getNodeChannel(position, 2) as never)).toVar();
+  const positionNode = position as any;
+  const baseCell = vec3(floor(positionNode.x as never), floor(positionNode.y as never), floor(positionNode.z as never)).toVar();
   const localpos = fract(position as never).toVar();
   const sqdist = float(1e6).toVar();
   const minpos = vec3(0, 0, 0).toVar();
 
   // Type inference blows up on deeply nested TSL loop nodes; runtime behavior is correct.
-  // @ts-expect-error - TSL node unions become too complex for TS to represent here.
-  Loop({ start: -1, end: int(1), condition: '<=' }, ({ i: x }) => {
-    Loop({ start: -1, end: int(1), condition: '<=' }, ({ i: y }) => {
-      Loop({ start: -1, end: int(1), condition: '<=' }, ({ i: z }) => {
+  (Loop as any)({ start: -1, end: int(1), name: 'x', condition: '<=' }, ({ x }: { x: unknown }) => {
+    (Loop as any)({ start: -1, end: int(1), name: 'y', condition: '<=' }, ({ y }: { y: unknown }) => {
+      (Loop as any)({ start: -1, end: int(1), name: 'z', condition: '<=' }, ({ z }: { z: unknown }) => {
+        const baseCellNode = baseCell as any;
         const cellCoords = vec3(
-          add(getNodeChannel(baseCell, 0) as never, float(x as never) as never),
-          add(getNodeChannel(baseCell, 1) as never, float(y as never) as never),
-          add(getNodeChannel(baseCell, 2) as never, float(z as never) as never),
+          baseCellNode.x.add(float(x as never)),
+          baseCellNode.y.add(float(y as never)),
+          baseCellNode.z.add(float(z as never)),
         ).toVar();
-        const off = vec3(
-          mx_cell_noise_float(vec4(cellCoords as never, float(0) as never) as never),
-          mx_cell_noise_float(vec4(cellCoords as never, float(1) as never) as never),
-          mx_cell_noise_float(vec4(cellCoords as never, float(2) as never) as never),
-        ).toVar();
+        const off = vec3(mxCellNoiseVec3MaterialX(cellCoords) as never).toVar();
         off.subAssign(float(0.5));
-        off.mulAssign(jitter);
+        off.mulAssign(jitter as never);
         off.addAssign(float(0.5));
         const cellpos = vec3(
           sub(
@@ -371,7 +503,7 @@ const mxWorleyNoiseFloatMaterialX3d = ((Fn as any)(([positionInput, jitterInput,
     });
   });
 
-  If(style.equal(int(1)), () => {
+  If((style as any).equal(int(1)), () => {
     sqdist.assign(mx_cell_noise_float(add(minpos as never, position as never) as never) as never);
   }).Else(() => {
     sqdist.assign(sqrt(sqdist as never) as never);
@@ -397,7 +529,8 @@ const mxUnifiedNoise2dMaterialX = (
   const applyFreq = mul(texcoord as never, freq as never);
   const applyOffset = add(applyFreq as never, offset as never);
   const cellJitterMult = mul(sub(jitter as never, float(1)) as never, float(90000));
-  const applyCellJitter = vec3(
+  const applyCellJitter = rotate2dMaterialX(applyOffset, cellJitterMult);
+  const fractalInput = vec3(
     getNodeChannel(applyOffset, 0) as never,
     getNodeChannel(applyOffset, 1) as never,
     cellJitterMult as never,
@@ -406,7 +539,7 @@ const mxUnifiedNoise2dMaterialX = (
   const cell = mx_cell_noise_float(applyCellJitter as never);
   const worley = mx_worley_noise_float_materialx_2d(applyOffset, jitter, style);
   const fractal = mx_fractal_noise_float(
-    applyCellJitter as never,
+    fractalInput as never,
     octaves as never,
     lacunarity as never,
     diminish as never,
