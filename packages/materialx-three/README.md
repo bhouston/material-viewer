@@ -2,7 +2,7 @@
 
 MaterialX-to-Three.js bridge for compiling MaterialX documents into Three TSL-driven materials.
 
-This package is designed to sit on top of `@material-viewer/materialx` and produce `MeshPhysicalNodeMaterial` assignments from MaterialX graphs, with a current focus on Standard Surface and OpenPBR workflows.
+This package is designed to sit on top of `@material-viewer/mtlx-core` and produce `MeshPhysicalNodeMaterial` assignments from MaterialX graphs, with a current focus on Standard Surface and OpenPBR workflows.
 
 ## Current Scope
 
@@ -59,7 +59,7 @@ pnpm --filter @material-viewer/materialx-three dev
 ## Basic Usage
 
 ```ts
-import { parseMaterialX } from '@material-viewer/materialx';
+import { parseMaterialX } from '@material-viewer/mtlx-core';
 import {
   compileMaterialXToTSL,
   createThreeMaterialFromDocument,

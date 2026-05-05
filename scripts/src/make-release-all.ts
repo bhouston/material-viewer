@@ -9,7 +9,7 @@ const __dirname = dirname(__filename);
 const rootPath = resolve(__dirname, '../..');
 const makeReleasePath = join(rootPath, 'scripts/src/make-release.ts');
 
-const releaseOrder = ['packages/materialx', 'packages/materialx-cli', 'packages/materialx-three'];
+const releaseOrder = ['packages/mtlx-core', 'packages/mtlx', 'packages/materialx-three'];
 
 function main(): void {
   const dryRun = process.argv.includes('--dry-run');

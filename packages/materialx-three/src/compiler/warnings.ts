@@ -1,4 +1,4 @@
-import type { MaterialXDocument, MaterialXNode } from '@material-viewer/materialx';
+import type { MaterialXDocument, MaterialXNode } from '@material-viewer/mtlx-core';
 import type { CompileContext } from './internal-types.js';
 
 export const warn = (context: CompileContext, warning: CompileContext['warnings'][number]): void => {

@@ -20,7 +20,7 @@ export const main = async () => {
   }
 
   return yargs(hideBin(process.argv))
-    .scriptName('materialx')
+    .scriptName('mtlx')
     .version(version)
     .command(await fileCommands({ commandDirs: [commandsDir] }))
     .demandCommand(1, 'No command specified - use --help for available commands')

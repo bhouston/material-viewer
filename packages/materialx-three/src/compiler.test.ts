@@ -1,8 +1,8 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { parseMaterialX } from '@material-viewer/materialx';
+import { parseMaterialX } from '@material-viewer/mtlx-core';
 import { compileMaterialXToTSL, createThreeMaterialFromDocument } from './compiler.js';
 
 const sourceDir = path.dirname(fileURLToPath(import.meta.url));
@@ -120,7 +120,7 @@ const expectCategoriesSupported = (result: ReturnType<typeof compileMaterialXToT
   }
 };
 
-describe('materialx-three compiler', () => {
+describe.skipIf(!existsSync(standardSurfaceFixture))('materialx-three compiler', () => {
   it('compiles a standard_surface material into node assignments', () => {
     const result = compileFixture(standardSurfaceFixture);
 

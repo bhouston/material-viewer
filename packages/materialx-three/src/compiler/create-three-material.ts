@@ -1,4 +1,4 @@
-import type { MaterialXDocument } from '@material-viewer/materialx';
+import type { MaterialXDocument } from '@material-viewer/mtlx-core';
 import { Color } from 'three';
 import { cos, float, mul, sin, transformNormalToView, vec2 } from 'three/tsl';
 import { DoubleSide, MeshPhysicalNodeMaterial } from 'three/webgpu';

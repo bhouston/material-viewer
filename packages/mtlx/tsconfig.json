@@ -3,5 +3,5 @@
   "compilerOptions": {
     "composite": true
   },
-  "references": [{ "path": "../materialx" }]
+  "references": [{ "path": "../mtlx-core" }]
 }

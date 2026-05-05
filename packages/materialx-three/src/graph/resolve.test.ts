@@ -1,8 +1,8 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { parseMaterialX } from '@material-viewer/materialx';
+import { parseMaterialX } from '@material-viewer/mtlx-core';
 import { buildGraphIndex, resolveInputReference, topologicallySortFromNode } from './resolve.js';
 
 const sourceDir = path.dirname(fileURLToPath(import.meta.url));
@@ -11,7 +11,7 @@ const fixturePath = path.resolve(
   '../../../../../MaterialX/resources/Materials/Examples/StandardSurface/standard_surface_brick_procedural.mtlx',
 );
 
-describe('graph resolver', () => {
+describe.skipIf(!existsSync(fixturePath))('graph resolver', () => {
   it('resolves surfaceshader reference from surfacematerial', () => {
     const xml = readFileSync(fixturePath, 'utf8');
     const document = parseMaterialX(xml);

@@ -1,6 +1,6 @@
 # materialx-three Node Coverage
 
-Generated from `@material-viewer/materialx` node registry.
+Generated from `@material-viewer/mtlx-core` node registry.
 
 ## Summary
 

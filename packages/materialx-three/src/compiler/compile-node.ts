@@ -1,4 +1,4 @@
-import type { MaterialXNode, MaterialXNodeGraph } from '@material-viewer/materialx';
+import type { MaterialXNode, MaterialXNodeGraph } from '@material-viewer/mtlx-core';
 import type { CompileContext, NodeHandler } from './internal-types.js';
 import { cacheKey, createResolveInputNode, readInput } from './inputs.js';
 import { getNodeChannel, outputNameToChannelIndex } from './matrix-ops.js';

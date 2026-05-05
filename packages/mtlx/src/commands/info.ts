@@ -1,9 +1,9 @@
-import { readMaterialX } from '@material-viewer/materialx';
+import { readMaterialX } from '@material-viewer/mtlx-core';
 import { defineCommand } from 'yargs-file-commands';
 
 export const command = defineCommand({
-  command: 'read <input>',
-  describe: 'Read a MaterialX file and print document stats',
+  command: 'info <input>',
+  describe: 'Print information about a MaterialX file',
   builder: (yargs) =>
     yargs.positional('input', {
       describe: 'Path to .mtlx file',

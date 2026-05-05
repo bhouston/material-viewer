@@ -1,4 +1,4 @@
-import type { MaterialXDocument, MaterialXNode, MaterialXNodeGraph } from '@material-viewer/materialx';
+import type { MaterialXDocument, MaterialXNode, MaterialXNodeGraph } from '@material-viewer/mtlx-core';
 import type { buildGraphIndex } from '../graph/resolve.js';
 import type { MaterialXThreeCompileOptions, MaterialXThreeWarning } from '../types.js';
 

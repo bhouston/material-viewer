@@ -6,8 +6,8 @@
   "files": [],
   "include": [],
   "references": [
-    { "path": "./packages/materialx" },
-    { "path": "./packages/materialx-cli" },
+    { "path": "./packages/mtlx-core" },
+    { "path": "./packages/mtlx" },
     { "path": "./packages/materialx-three" }
   ]
 }

@@ -1,4 +1,4 @@
-import type { MaterialXNode } from '@material-viewer/materialx';
+import type { MaterialXNode } from '@material-viewer/mtlx-core';
 import { div, max, mul, pow } from 'three/tsl';
 import type { MaterialSlotAssignments } from '../types.js';
 

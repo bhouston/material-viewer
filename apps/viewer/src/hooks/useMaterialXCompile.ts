@@ -1,4 +1,4 @@
-import { parseMaterialX } from '@material-viewer/materialx/dist/xml.js';
+import { parseMaterialX } from '@material-viewer/mtlx-core/dist/xml.js';
 import { createThreeMaterialFromDocument } from '@material-viewer/materialx-three';
 import { useEffect, useMemo, useRef } from 'react';
 import { createBrowserTextureResolver } from '../lib/browser-texture-resolver';

@@ -1,4 +1,4 @@
-import type { MaterialXNode, MaterialXNodeGraph } from '@material-viewer/materialx';
+import type { MaterialXNode, MaterialXNodeGraph } from '@material-viewer/mtlx-core';
 import {
   abs,
   add,

@@ -4,8 +4,8 @@ TypeScript monorepo for reading, validating, and writing MaterialX XML, with nod
 
 ## Packages
 
-- `packages/materialx` - typed MaterialX document model, XML parser/serializer, filesystem IO helpers, validation API, generated node registry
-- `packages/materialx-cli` - command-line tool built with `yargs-file-commands`
+- `packages/mtlx-core` - typed MaterialX document model, XML parser/serializer, filesystem IO helpers, validation API, generated node registry
+- `packages/mtlx` - command-line tool built with `yargs-file-commands`
 - `packages/materialx-three` - MaterialX to Three.js TSL compiler/runtime for Standard Surface-first workflows
 - `apps/viewer` - TanStack Start preview app for interactive MaterialX -> Three TSL diagnostics and rendering
 
@@ -47,13 +47,13 @@ Commands:
 
 ```bash
 # Publish one package
-pnpm release:package packages/materialx
+pnpm release:package packages/mtlx-core
 
 # Publish all packages in order
 pnpm release:all
 
 # Dry-run staging only (no npm publish)
-pnpm release:package packages/materialx --dry-run
+pnpm release:package packages/mtlx-core --dry-run
 pnpm release:all --dry-run
 ```
 
@@ -71,15 +71,15 @@ pnpm generate:nodes
 
 This regenerates:
 
-- `packages/materialx/src/generated/node-registry.generated.ts`
+- `packages/mtlx-core/src/generated/node-registry.generated.ts`
 
 ## CLI Commands
 
 ```bash
-pnpm cli -- read <input.mtlx>
-pnpm cli -- write <input.mtlx> <output.mtlx>
-pnpm cli -- validate <input.mtlx>
-pnpm cli -- nodes list
+pnpm cli -- info <input.mtlx>
+pnpm cli -- check <input.mtlx|input.mtlz>
+pnpm cli -- pack <input.mtlx>
+pnpm cli -- unpack <input.mtlz>
 ```
 
 ## Validation Corpus

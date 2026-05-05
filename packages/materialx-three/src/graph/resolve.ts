@@ -4,7 +4,7 @@ import type {
   MaterialXNode,
   MaterialXNodeGraph,
   MaterialXOutput,
-} from '@material-viewer/materialx';
+} from '@material-viewer/mtlx-core';
 
 export interface GraphReference {
   sourceNode: MaterialXNode;

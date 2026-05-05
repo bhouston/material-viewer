@@ -11,7 +11,7 @@
     "generate:coverage": "node ./dist/scripts/generate-coverage-report.js"
   },
   "dependencies": {
-    "@material-viewer/materialx": "workspace:*",
+    "@material-viewer/mtlx-core": "workspace:*",
     "three": "0.184.0"
   },
   "devDependencies": {

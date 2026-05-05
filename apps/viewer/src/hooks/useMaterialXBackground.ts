@@ -1,4 +1,4 @@
-import { parseMaterialX } from '@material-viewer/materialx/dist/xml.js';
+import { parseMaterialX } from '@material-viewer/mtlx-core/dist/xml.js';
 import { createThreeMaterialFromDocument } from '@material-viewer/materialx-three';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { loadMaterialXBackgroundPack, materialXBackgroundPacks } from '../lib/backgrounds';
